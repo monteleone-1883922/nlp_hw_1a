@@ -11,6 +11,7 @@ import random as rnd
 import sys
 
 SENTENCE_START = "_____"
+ENG_VOCABULARY_PATH = "data/eng_vocabulary.txt"
 
 DECODE_TAGS = {
     "ADJ": "aggettivo",
@@ -121,6 +122,20 @@ def find_repeated_words(sentences):
     return dangerous_sentences, dangerous_sentences_idx, dangerous_words
 
 
+def find_english_words(sentences):
+    suspected_sentences = []
+    with open(ENG_VOCABULARY_PATH, 'r') as file:
+        eng_words = set([line.strip() for line in file])
+    for sentence in sentences:
+        for word in sentence[1:]:
+            if word[0] in eng_words and word[1] != "PROPN":
+                suspected_sentences.append(
+                    " ".join([word_[0] if word_[0] != word[0] else "##" + word_[0] for word_ in sentence[1:]]))
+                break
+    return suspected_sentences
+
+
+
 def build_common_tags_for_word(sentences):
     common_tags = {}
     for sentence in sentences:
@@ -131,26 +146,27 @@ def build_common_tags_for_word(sentences):
     return common_tags
 
 
-def create_json(sentences, file_name):
+def create_json(sentences, file_name, sentences_to_remove=set()):
     json_sentences = []
     most_common_tags_for_words = build_common_tags_for_word(sentences)
     most_common_tags = extract_most_common_tags(get_info_sentences(sentences))
     for sentence in sentences:
         sentence_id = sentence[0][0]
-        sentence_text = " ".join([word[0] for word in sentence[1:]])
-        for i, word in enumerate(sentence[1:]):
-            label = rnd.randint(0, 3)
-            sentence_dict = {
-                "sentence_id": sentence_id,
-                "sentence": sentence_text,
-                "target_word": word[0],
-                "word_idx": i,
-                "choices": generate_distractors(word[0], word[1], label, most_common_tags_for_words,
-                                                most_common_tags.copy()),
-                "label": label
-            }
-            json_sentences.append(sentence_dict)
-    with open(file_name, 'w') as jsonl_file:
+        if sentence_id not in sentences_to_remove:
+            sentence_text = " ".join([word[0] for word in sentence[1:]])
+            for i, word in enumerate(sentence[1:]):
+                label = rnd.randint(0, 3)
+                sentence_dict = {
+                    "sentence_id": sentence_id,
+                    "sentence": sentence_text,
+                    "target_word": word[0],
+                    "word_idx": i,
+                    "choices": generate_distractors(word[0], word[1], label, most_common_tags_for_words,
+                                                    most_common_tags.copy()),
+                    "label": label
+                }
+                json_sentences.append(sentence_dict)
+    with open(file_name, 'w', encoding='utf8') as jsonl_file:
         for item in json_sentences:
             json.dump(item, jsonl_file)  # Scrivi l'oggetto JSON
             jsonl_file.write('\n')
@@ -163,11 +179,13 @@ if __name__ == '__main__':
     input_file = sys.argv[1]
     output_file = sys.argv[2]
     sentences = get_list_sentences(input_file)
-    # create_json(sentences, output_file)
-    info = get_info_sentences(sentences)
-    print(extract_most_common_tags(info))
-    # pp.pprint(info)
+    suspected_sentences = find_english_words(sentences)
+    with open("suspected_sentences.txt", 'w') as file:
+        for sentence in suspected_sentences:
+            file.write(sentence + "\n")
     # dangerous_sentences, dangerous_sentences_idx, dangerous_words = find_repeated_words(sentences)
-    # with open("dangerous_sentences.txt", 'w', encoding='utf8') as file:
-    #     for sentence in dangerous_sentences:
-    #         file.write(sentence + "\n")
+    # create_json(sentences, output_file)
+    # info = get_info_sentences(sentences)
+    # print(extract_most_common_tags(info))
+    # pp.pprint(info)
+
