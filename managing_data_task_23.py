@@ -101,7 +101,7 @@ def generate_distractors(word, tag, tag_position, most_common_tags_for_words, mo
     return choiches
 
 
-def find_repeated_words(sentences):
+def find_repeated_words(sentences, write_output=False):
     dangerous_sentences = []
     dangerous_sentences_idx = []
     dangerous_words = {}
@@ -112,27 +112,39 @@ def find_repeated_words(sentences):
         for word in sentence[1:]:
             if word[0] in words and word not in words_and_tags:
                 dangerous_sentences.append(
-                    " ".join([word_[0] if word_[0] != word[0] else "##" + word_[0] for word_ in sentence[1:]]))
+                    sentence_id + " | " + " ".join([word_[0] if word_[0] != word[0] else "##" + word_[0] for word_ in sentence[1:]]))
                 dangerous_sentences_idx.append(sentence_id)
                 dangerous_words[word[0]] = dangerous_words.get(word[0], 0) + 1
                 break
             else:
                 words.add(word[0])
                 words_and_tags.add(word)
-    return dangerous_sentences, dangerous_sentences_idx, dangerous_words
+    if write_output:
+        with open("data/postwita/dangerous_sentences.txt", 'w', encoding='utf8') as file:
+            for sentence in suspected_sentences:
+                file.write(sentence + "\n")
+    return dangerous_sentences, set(dangerous_sentences_idx), dangerous_words
 
 
-def find_english_words(sentences):
+def find_english_words(sentences, write_output=False):
     suspected_sentences = []
+    suspected_sentences_idx = []
+    words_found = set()
     with open(ENG_VOCABULARY_PATH, 'r') as file:
-        eng_words = set([line.strip() for line in file])
+        eng_words = set([line.strip().lower() for line in file])
     for sentence in sentences:
         for word in sentence[1:]:
-            if word[0] in eng_words and word[1] != "PROPN":
+            if word[0].lower() in eng_words and word[1] != "PROPN":
+                words_found.add(word[0].lower())
                 suspected_sentences.append(
-                    " ".join([word_[0] if word_[0] != word[0] else "##" + word_[0] for word_ in sentence[1:]]))
+                    sentence[0][0] + " | " + " ".join([word_[0] if word_[0] != word[0] else "##" + word_[0] for word_ in sentence[1:]]))
+                suspected_sentences_idx.append(sentence[0][0])
                 break
-    return suspected_sentences
+    if write_output:
+        with open("data/postwita/suspected_eng_sentences.txt", 'w', encoding='utf8') as file:
+            for sentence in suspected_sentences:
+                file.write(sentence + "\n")
+    return suspected_sentences, set(suspected_sentences_idx), words_found
 
 
 
@@ -179,10 +191,8 @@ if __name__ == '__main__':
     input_file = sys.argv[1]
     output_file = sys.argv[2]
     sentences = get_list_sentences(input_file)
-    suspected_sentences = find_english_words(sentences)
-    with open("suspected_sentences.txt", 'w') as file:
-        for sentence in suspected_sentences:
-            file.write(sentence + "\n")
+    suspected_sentences, suspected_sentence_idx, words_found = find_english_words(sentences, write_output=True)
+    print(words_found)
     # dangerous_sentences, dangerous_sentences_idx, dangerous_words = find_repeated_words(sentences)
     # create_json(sentences, output_file)
     # info = get_info_sentences(sentences)
