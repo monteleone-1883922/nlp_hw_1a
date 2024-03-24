@@ -1,3 +1,4 @@
+a
 abandon
 ability
 able
@@ -35,6 +36,7 @@ actor
 actress
 actual
 actually
+ad
 adapt
 add
 addition
@@ -72,14 +74,18 @@ again
 against
 age
 agency
+agenda
 agent
 aggressive
+ago
 agree
 agreement
 agricultural
+ah
 ahead
 aid
 aide
+AIDS
 aim
 air
 aircraft
@@ -88,6 +94,7 @@ airport
 album
 alcohol
 alive
+all
 alliance
 allow
 ally
@@ -119,6 +126,7 @@ announce
 annual
 another
 answer
+anticipate
 anxiety
 any
 anybody
@@ -147,6 +155,7 @@ approve
 approximately
 Arab
 architect
+area
 argue
 argument
 arise
@@ -176,10 +185,12 @@ assessment
 asset
 assign
 assignment
+assist
 assistance
 assistant
 associate
 association
+assume
 assumption
 assure
 at
@@ -199,6 +210,7 @@ attribute
 audience
 author
 authority
+auto
 available
 average
 avoid
@@ -217,14 +229,18 @@ bake
 balance
 ball
 ban
+band
 bank
+bar
 barely
 barrel
 barrier
+base
 baseball
 basic
 basically
 basis
+basket
 basketball
 bathroom
 battery
@@ -339,6 +355,7 @@ bunch
 burden
 burn
 bury
+bus
 business
 busy
 but
@@ -353,6 +370,7 @@ cable
 cake
 calculate
 call
+camera
 camp
 campaign
 campus
@@ -370,16 +388,20 @@ capture
 car
 carbon
 card
+care
 career
 careful
 carefully
 carrier
 carry
+case
 cash
+cast
 cat
 catch
 category
 Catholic
+cause
 ceiling
 celebrate
 celebration
@@ -399,6 +421,7 @@ challenge
 chamber
 champion
 championship
+chance
 change
 changing
 channel
@@ -480,6 +503,7 @@ color
 column
 combination
 combine
+come
 comedy
 comfort
 comfortable
@@ -498,6 +522,7 @@ community
 company
 compare
 comparison
+compete
 competition
 competitive
 competitor
@@ -511,6 +536,7 @@ component
 compose
 composition
 comprehensive
+computer
 concentrate
 concentration
 concept
@@ -519,6 +545,7 @@ concerned
 concert
 conclude
 conclusion
+concrete
 condition
 conduct
 conference
@@ -553,6 +580,7 @@ consumer
 consumption
 contact
 contain
+container
 contemporary
 content
 contest
@@ -610,7 +638,10 @@ craft
 crash
 crazy
 cream
+create
 creation
+creative
+creature
 credit
 crew
 crime
@@ -627,6 +658,7 @@ crowd
 crucial
 cry
 cultural
+culture
 cup
 curious
 current
@@ -642,8 +674,11 @@ damage
 dance
 danger
 dangerous
+dare
 dark
 darkness
+data
+date
 daughter
 day
 dead
@@ -653,6 +688,8 @@ dear
 death
 debate
 debt
+decade
+decide
 decision
 deck
 declare
@@ -666,6 +703,7 @@ defend
 defendant
 defense
 defensive
+deficit
 define
 definitely
 definition
@@ -755,10 +793,13 @@ distinguish
 distribute
 distribution
 district
+diverse
 diversity
 divide
 division
 divorce
+DNA
+do
 doctor
 document
 dog
@@ -786,6 +827,7 @@ driver
 drop
 drug
 dry
+due
 during
 dust
 duty
@@ -834,6 +876,7 @@ eliminate
 elite
 else
 elsewhere
+e-mail
 embrace
 emerge
 emergency
@@ -877,6 +920,7 @@ episode
 equal
 equally
 equipment
+era
 error
 escape
 especially
@@ -906,6 +950,7 @@ everything
 everywhere
 evidence
 evolution
+evolve
 exact
 exactly
 examination
@@ -970,15 +1015,19 @@ false
 familiar
 family
 famous
+fan
 fantasy
+far
 farm
 farmer
 fashion
 fast
 fat
+fate
 father
 fault
 favor
+favorite
 fear
 feature
 federal
@@ -992,6 +1041,7 @@ fence
 few
 fewer
 fiber
+fiction
 field
 fifteen
 fifth
@@ -1000,13 +1050,16 @@ fight
 fighter
 fighting
 figure
+file
 fill
+film
 final
 finally
 finance
 financial
 find
 finding
+fine
 finger
 finish
 fire
@@ -1030,6 +1083,7 @@ floor
 flow
 flower
 fly
+focus
 folk
 follow
 following
@@ -1048,6 +1102,7 @@ formation
 former
 formula
 forth
+fortune
 forward
 found
 foundation
@@ -1090,13 +1145,17 @@ gallery
 game
 gang
 gap
+garage
 garden
 garlic
+gas
 gate
 gather
+gay
 gaze
 gear
 gender
+gene
 general
 generally
 generate
@@ -1125,6 +1184,7 @@ goal
 God
 gold
 golden
+golf
 good
 government
 governor
@@ -1138,6 +1198,7 @@ grandfather
 grandmother
 grant
 grass
+grave
 gray
 great
 greatest
@@ -1152,6 +1213,7 @@ guarantee
 guard
 guess
 guest
+guide
 guideline
 guilty
 gun
@@ -1231,6 +1293,7 @@ horse
 hospital
 host
 hot
+hotel
 hour
 house
 household
@@ -1247,7 +1310,9 @@ hunting
 hurt
 husband
 hypothesis
+I
 ice
+idea
 ideal
 identification
 identify
@@ -1272,12 +1337,14 @@ implication
 imply
 importance
 important
+impose
 impossible
 impress
 impression
 impressive
 improve
 improvement
+in
 incentive
 incident
 include
@@ -1338,6 +1405,7 @@ interested
 interesting
 internal
 international
+Internet
 interpret
 interpretation
 intervention
@@ -1434,6 +1502,7 @@ lawyer
 lay
 layer
 lead
+leader
 leadership
 leading
 leaf
@@ -1473,6 +1542,7 @@ limit
 limitation
 limited
 line
+link
 lip
 list
 listen
@@ -1480,6 +1550,7 @@ literally
 literary
 literature
 little
+live
 living
 load
 loan
@@ -1509,6 +1580,7 @@ lung
 machine
 mad
 magazine
+mail
 main
 mainly
 maintain
@@ -1518,10 +1590,12 @@ majority
 make
 maker
 makeup
+male
 mall
 man
 manage
 management
+manager
 manner
 manufacturer
 manufacturing
@@ -1545,6 +1619,7 @@ matter
 may
 maybe
 mayor
+me
 meal
 mean
 meaning
@@ -1553,8 +1628,11 @@ measure
 measurement
 meat
 mechanism
+media
 medical
 medication
+medicine
+medium
 meet
 meeting
 member
@@ -1577,7 +1655,9 @@ military
 milk
 million
 mind
+mine
 minister
+minor
 minority
 minute
 miracle
@@ -1586,18 +1666,23 @@ miss
 missile
 mission
 mistake
+mix
 mixture
 mm-hmm
+mode
 model
+moderate
 modern
 modest
 mom
 moment
 money
+monitor
 month
 mood
 moon
 moral
+more
 moreover
 morning
 mortgage
@@ -1609,6 +1694,7 @@ motivation
 motor
 mount
 mountain
+mouse
 mouth
 move
 movement
@@ -1617,10 +1703,12 @@ Mr
 Mrs
 Ms
 much
+multiple
 murder
 muscle
 museum
 music
+musical
 musician
 Muslim
 must
@@ -1635,6 +1723,7 @@ narrative
 narrow
 nation
 national
+native
 natural
 naturally
 nature
@@ -1645,6 +1734,7 @@ necessarily
 necessary
 neck
 need
+negative
 negotiate
 negotiation
 neighbor
@@ -1658,11 +1748,13 @@ never
 nevertheless
 new
 newly
+news
 newspaper
 next
 nice
 night
 nine
+no
 nobody
 nod
 noise
@@ -1676,6 +1768,7 @@ north
 northern
 nose
 not
+note
 nothing
 notice
 notion
@@ -1708,12 +1801,16 @@ odds
 of
 off
 offense
+offensive
 offer
 office
 officer
 official
 often
+oh
 oil
+ok
+okay
 old
 Olympic
 on
@@ -1721,6 +1818,7 @@ once
 one
 ongoing
 onion
+online
 only
 onto
 open
@@ -1764,6 +1862,7 @@ overlook
 owe
 own
 owner
+pace
 pack
 package
 page
@@ -1793,13 +1892,16 @@ partly
 partner
 partnership
 party
+pass
 passage
 passenger
 passion
 past
+patch
 path
 patient
 pattern
+pause
 pay
 payment
 PC
@@ -1809,6 +1911,7 @@ peer
 penalty
 people
 pepper
+per
 perceive
 percentage
 perception
@@ -1840,10 +1943,12 @@ phrase
 physical
 physically
 physician
+piano
 pick
 picture
 pie
 piece
+pile
 pilot
 pine
 pink
@@ -1892,10 +1997,12 @@ portrait
 portray
 pose
 position
+positive
 possess
 possibility
 possible
 possibly
+post
 pot
 potato
 potential
@@ -1937,6 +2044,7 @@ pride
 priest
 primarily
 primary
+prime
 principal
 principle
 print
@@ -1944,14 +2052,20 @@ prior
 priority
 prison
 prisoner
+privacy
+private
 probably
 problem
+procedure
 proceed
 process
+produce
+producer
 product
 production
 profession
 professional
+professor
 profile
 profit
 program
@@ -1967,6 +2081,7 @@ properly
 property
 proportion
 proposal
+propose
 proposed
 prosecutor
 prospect
@@ -1975,8 +2090,10 @@ protection
 protein
 protest
 proud
+prove
 provide
 provider
+province
 provision
 psychological
 psychologist
@@ -1989,6 +2106,7 @@ publisher
 pull
 punishment
 purchase
+pure
 purpose
 pursue
 push
@@ -2008,6 +2126,7 @@ quote
 race
 racial
 radical
+radio
 rail
 rain
 raise
@@ -2015,7 +2134,9 @@ range
 rank
 rapid
 rapidly
+rare
 rarely
+rate
 rather
 rating
 ratio
@@ -2042,6 +2163,7 @@ recognition
 recognize
 recommend
 recommendation
+record
 recording
 recover
 recovery
@@ -2059,6 +2181,7 @@ refuse
 regard
 regarding
 regardless
+regime
 region
 regional
 register
@@ -2135,6 +2258,7 @@ rhythm
 rice
 rich
 rid
+ride
 rifle
 right
 ring
@@ -2142,6 +2266,7 @@ rise
 risk
 river
 road
+rock
 role
 roll
 romantic
@@ -2149,6 +2274,7 @@ roof
 room
 root
 rope
+rose
 rough
 roughly
 round
@@ -2169,6 +2295,7 @@ safety
 sake
 salad
 salary
+sale
 sales
 salt
 same
@@ -2182,9 +2309,11 @@ sauce
 save
 saving
 say
+scale
 scandal
 scared
 scenario
+scene
 schedule
 scheme
 scholar
@@ -2193,6 +2322,7 @@ school
 science
 scientific
 scientist
+scope
 score
 scream
 screen
@@ -2230,8 +2360,10 @@ sequence
 series
 serious
 seriously
+serve
 service
 session
+set
 setting
 settle
 settlement
@@ -2270,6 +2402,7 @@ shot
 should
 shoulder
 shout
+show
 shower
 shrug
 shut
@@ -2289,6 +2422,7 @@ similar
 similarly
 simple
 simply
+sin
 since
 sing
 singer
@@ -2322,8 +2456,10 @@ smoke
 smooth
 snap
 snow
+so
 so-called
 soccer
+social
 society
 soft
 software
@@ -2341,6 +2477,7 @@ something
 sometimes
 somewhat
 somewhere
+son
 song
 soon
 sophisticated
@@ -2371,6 +2508,9 @@ spirit
 spiritual
 split
 spokesman
+sport
+spot
+spread
 spring
 square
 squeeze
@@ -2384,7 +2524,9 @@ stand
 standard
 standing
 star
+stare
 start
+state
 statement
 station
 statistics
@@ -2400,6 +2542,7 @@ stir
 stock
 stomach
 stone
+stop
 storage
 store
 storm
@@ -2424,6 +2567,7 @@ strongly
 structure
 struggle
 student
+studio
 study
 stuff
 stupid
@@ -2440,6 +2584,7 @@ successfully
 such
 sudden
 suddenly
+sue
 suffer
 sufficient
 sugar
@@ -2450,6 +2595,7 @@ suit
 summer
 summit
 sun
+super
 supply
 support
 supporter
@@ -2600,6 +2746,7 @@ total
 totally
 touch
 tough
+tour
 tourist
 tournament
 toward
@@ -2643,7 +2790,9 @@ trust
 truth
 try
 tube
+tunnel
 turn
+TV
 twelve
 twenty
 twice
@@ -2707,8 +2856,10 @@ versus
 very
 vessel
 veteran
+via
 victim
 victory
+video
 view
 viewer
 village
@@ -2718,6 +2869,7 @@ violence
 violent
 virtually
 virtue
+virus
 visible
 vision
 visit
@@ -2725,9 +2877,11 @@ visitor
 visual
 vital
 voice
+volume
 volunteer
 vote
 voter
+vs
 vulnerable
 wage
 wait
@@ -2843,3 +2997,4 @@ your
 yours
 yourself
 youth
+zone
