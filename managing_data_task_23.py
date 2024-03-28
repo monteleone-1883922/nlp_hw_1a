@@ -9,6 +9,7 @@ import json
 import pprint as pp
 import random as rnd
 import sys
+import numpy as np
 
 SENTENCE_START = "_____"
 ENG_VOCABULARY_PATH = "data/eng_vocabulary.txt"
@@ -79,28 +80,29 @@ def extract_most_common_tags(sentences_info):
 
 
 def generate_distractors(word, tag, tag_position, most_common_tags_for_words, most_common_tags):
-    choiches = []
     tag = DECODE_TAGS[tag]
     tags_for_word = most_common_tags_for_words[word].copy()
-    tags_for_word.remove(tag)
-    tags_for_word = list(tags_for_word)
-    tmp = [i for i in range(len(tags_for_word))]
-    rnd.shuffle(tmp)
-    for i in range(min(len(tmp), 3)):
-        choice = tags_for_word[tmp[i]]
-        choiches.append(choice)
-    if len(choiches) < 3:
+    tags_for_word.pop(tag)
+    if len(tags_for_word) != 0:
+        tags_for_word = list(tags_for_word.items())
+        elements, weights = zip(*tags_for_word)
+        weights = np.array(weights, dtype=float)
+        weights /= weights.sum()
+        choices = np.random.choice(elements, p=weights, size=min(len(elements), 3), replace=False).tolist()
+    else:
+        choices = []
+    if len(choices) < 3:
         most_common_tags.remove(tag)
-        for choice in choiches:
+        for choice in choices:
             most_common_tags.remove(choice)
         tmp = [i for i in range(MAX_COMMON_TAGS_TO_CONSIDER)]
         rnd.shuffle(tmp)
-        l = len(choiches)
+        l = len(choices)
         for i in range(3 - l):
             choice = most_common_tags[tmp[i]]
-            choiches.append(choice)
-    choiches.insert(tag_position, tag)
-    return choiches
+            choices.append(choice)
+    choices.insert(tag_position, tag)
+    return choices
 
 
 def find_repeated_words(sentences, write_output=False):
@@ -123,7 +125,7 @@ def find_repeated_words(sentences, write_output=False):
                 words_and_tags.add(word)
     if write_output:
         with open("data/postwita/dangerous_sentences.txt", 'w', encoding='utf8') as file:
-            for sentence in suspected_sentences:
+            for sentence in dangerous_sentences:
                 file.write(sentence + "\n")
     return dangerous_sentences, set(dangerous_sentences_idx), dangerous_words
 
@@ -154,8 +156,8 @@ def build_common_tags_for_word(sentences):
     common_tags = {}
     for sentence in sentences:
         for word in sentence[1:]:
-            tags_word = common_tags.get(word[0], set())
-            tags_word.add(DECODE_TAGS[word[1]])
+            tags_word = common_tags.get(word[0], {})
+            tags_word[DECODE_TAGS[word[1]]] = tags_word.get(DECODE_TAGS[word[1]], 0) + 1
             common_tags[word[0]] = tags_word
     return common_tags
 
@@ -186,21 +188,23 @@ def create_json(sentences, file_name, sentences_to_remove=set()):
             jsonl_file.write('\n')
 
 
+
 if __name__ == '__main__':
     if len(sys.argv) != 3:
         print("Usage: python managing_data_task_23.py <input_file> <output_file>")
         sys.exit(1)
     input_file = sys.argv[1]
     output_file = sys.argv[2]
+
     sentences = get_list_sentences(input_file)
-    comm_tags_word = build_common_tags_for_word(sentences)
-    with open("test.txt", 'w', encoding='utf8') as file:
-        for key, value in comm_tags_word.items():
-            file.write(key + ": " + str(value) + "\n")
+    # comm_tags_word = build_common_tags_for_word(sentences)
+    # with open("test.txt", 'w', encoding='utf8') as file:
+    #     for key, value in comm_tags_word.items():
+    #         file.write(key + ": " + str(value) + "\n")
     # suspected_sentences, suspected_sentence_idx, words_found = find_english_words(sentences, write_output=True)
     # print(words_found)
-    # dangerous_sentences, dangerous_sentences_idx, dangerous_words = find_repeated_words(sentences)
-    # create_json(sentences, output_file)
+    dangerous_sentences, dangerous_sentences_idx, dangerous_words = find_repeated_words(sentences)
+    create_json(sentences, output_file, sentences_to_remove=dangerous_sentences_idx)
     # info = get_info_sentences(sentences)
     # print(extract_most_common_tags(info))
     # pp.pprint(info)
