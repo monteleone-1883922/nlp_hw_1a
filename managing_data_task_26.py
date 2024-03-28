@@ -1,16 +1,47 @@
-# This is a sample Python script.
+import editdistance
+from heapq import heappop, heappush, heapify
+import time
 
-# Press Maiusc+F10 to execute it or replace it with your code.
-# Press Double Shift to search everywhere for classes, files, tool windows, actions, and settings.
-
-
-def print_hi(name):
-    # Use a breakpoint in the code line below to debug your script.
-    print(f'Hi, {name}')  # Press Ctrl+8 to toggle the breakpoint.
+VOCABULARY_PATH = "data/SemEval2018-Task9/1B.italian.vocabulary.txt"
+K = 5
 
 
-# Press the green button in the gutter to run the script.
-if __name__ == '__main__':
-    print_hi('PyCharm')
+def get_vocabulary():
+    return set([line.strip().lower() for line in open(VOCABULARY_PATH, 'r')])
 
-# See PyCharm help at https://www.jetbrains.com/help/pycharm/
+def get_distance(word1, word2):
+    return editdistance.eval(word1, word2)
+
+
+def get_possible_distractors(targets: set[str], vocabulary: set[str]):
+    distractors = set()
+    for target in targets:
+        heap = []
+        heapify(heap)
+        for word in vocabulary:
+            if word not in distractors and word not in targets:
+                if len(heap) < K:
+                    heappush(heap,  (-1 * get_distance(target, word), word))
+                elif editdistance.eval(target, word) < -1 * heap[0][0]:
+                    heappop(heap)
+                    heappush(heap,  (-1 * get_distance(target, word), word))
+        for word in heap:
+            distractors.add(word[1])
+    return distractors
+
+def test():
+    vocabulary = get_vocabulary()
+    targets = ["sesto", "grado", "numero ordinale",	"frazione",	"carica"]
+    tmp = time.time()
+    distractors = get_possible_distractors(set(targets), vocabulary)
+    print("the function has been executed in ",time.time() - tmp, " seconds")
+    print(distractors)
+
+
+
+
+if __name__ == "__main__":
+    test()
+
+
+
