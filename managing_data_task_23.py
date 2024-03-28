@@ -55,7 +55,7 @@ def get_list_sentences(file_path):
                 sentence = [(line.strip().strip(SENTENCE_START), "")]  # sentence id
             elif line.strip() != "":
                 tmp = line.split()
-                pair = (tmp[0].lower(), tmp[1])
+                pair = (tmp[0], tmp[1])
                 sentence.append(pair)
         sentences.append(sentence)
     return sentences
@@ -156,9 +156,9 @@ def build_common_tags_for_word(sentences):
     common_tags = {}
     for sentence in sentences:
         for word in sentence[1:]:
-            tags_word = common_tags.get(word[0], {})
+            tags_word = common_tags.get(word[0].lower(), {})
             tags_word[DECODE_TAGS[word[1]]] = tags_word.get(DECODE_TAGS[word[1]], 0) + 1
-            common_tags[word[0]] = tags_word
+            common_tags[word[0].lower()] = tags_word
     return common_tags
 
 
