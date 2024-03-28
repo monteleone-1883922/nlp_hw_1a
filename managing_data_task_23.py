@@ -43,17 +43,15 @@ DECODE_TAGS = {
 MAX_COMMON_TAGS_TO_CONSIDER = 7
 
 
-def generate_pandas(file_path):
+def generate_pandas(sentences):
     pandas_structure = []
-    with open(file_path, 'r', encoding='utf8') as file:
-        for line in file:
-            if not line.strip().startswith(SENTENCE_START) and line.strip() != "":
-                tmp = line.split()
-                element = {
-                    "word": tmp[0].lower(),
-                    "tag": tmp[1]
-                }
-                pandas_structure.append(element)
+    for sentence in sentences:
+        for pair in sentence:
+            element = {
+                "word": pair[0],
+                "tag": pair[1]
+            }
+            pandas_structure.append(element)
     return pd.DataFrame(pandas_structure)
 
 
