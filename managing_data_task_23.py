@@ -53,7 +53,9 @@ def get_list_sentences(file_path):
                 first_line = False
                 sentence = [(line.strip().strip(SENTENCE_START), "")]  # sentence id
             elif line.strip() != "":
-                sentence.append(tuple(line.split()))
+                tmp = line.split()
+                pair = (tmp[0].lower(), tmp[1])
+                sentence.append(pair)
         sentences.append(sentence)
     return sentences
 
@@ -191,8 +193,12 @@ if __name__ == '__main__':
     input_file = sys.argv[1]
     output_file = sys.argv[2]
     sentences = get_list_sentences(input_file)
-    suspected_sentences, suspected_sentence_idx, words_found = find_english_words(sentences, write_output=True)
-    print(words_found)
+    comm_tags_word = build_common_tags_for_word(sentences)
+    with open("test.txt", 'w', encoding='utf8') as file:
+        for key, value in comm_tags_word.items():
+            file.write(key + ": " + str(value) + "\n")
+    # suspected_sentences, suspected_sentence_idx, words_found = find_english_words(sentences, write_output=True)
+    # print(words_found)
     # dangerous_sentences, dangerous_sentences_idx, dangerous_words = find_repeated_words(sentences)
     # create_json(sentences, output_file)
     # info = get_info_sentences(sentences)
