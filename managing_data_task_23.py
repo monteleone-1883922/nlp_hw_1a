@@ -9,6 +9,7 @@ import json
 import pprint as pp
 import random as rnd
 import sys
+import pandas as pd
 
 SENTENCE_START = "_____"
 ENG_VOCABULARY_PATH = "data/eng_vocabulary.txt"
@@ -40,6 +41,20 @@ DECODE_TAGS = {
     "X": "altro"
 }
 MAX_COMMON_TAGS_TO_CONSIDER = 7
+
+
+def generate_pandas(file_path):
+    pandas_structure = []
+    with open(file_path, 'r', encoding='utf8') as file:
+        for line in file:
+            if not line.strip().startswith(SENTENCE_START) and line.strip() != "":
+                tmp = line.split()
+                element = {
+                    "word": tmp[0].lower(),
+                    "tag": tmp[1]
+                }
+                pandas_structure.append(element)
+    return pd.DataFrame(pandas_structure)
 
 
 def get_list_sentences(file_path):
@@ -192,11 +207,13 @@ if __name__ == '__main__':
         sys.exit(1)
     input_file = sys.argv[1]
     output_file = sys.argv[2]
-    sentences = get_list_sentences(input_file)
-    comm_tags_word = build_common_tags_for_word(sentences)
-    with open("test.txt", 'w', encoding='utf8') as file:
-        for key, value in comm_tags_word.items():
-            file.write(key + ": " + str(value) + "\n")
+    data = generate_pandas(input_file)
+    data = data.groupby(['word', 'tag']).size().reset_index(name='counts')
+    print("len = ", len(data))
+    print(data.head(10))
+    #sentences = get_list_sentences(input_file)
+    #comm_tags_word = build_common_tags_for_word(sentences)
+
     # suspected_sentences, suspected_sentence_idx, words_found = find_english_words(sentences, write_output=True)
     # print(words_found)
     # dangerous_sentences, dangerous_sentences_idx, dangerous_words = find_repeated_words(sentences)
