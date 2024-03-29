@@ -2,7 +2,11 @@
 #include <iostream>
 #include <fstream>
 #include <algorithm>
+#include <vector>
+#include <sstream>
 #include <string>
+#include "nlohmann/json.hpp"
+#include <random>
 
 const std::string VOCABULARY_PATH = "data/SemEval2018-Task9/1B.italian.vocabulary.txt";
 const int K = 5;
@@ -82,6 +86,81 @@ std::set<std::string> getPossibleDistractors(const std::set<std::string> &target
 }
 
 
+std::vector<std::pair<std::string, std::vector<std::string>>> getData(const std::string &hyponymFile, const std::string &hypernymFile) {
+    std::vector<std::pair<std::string, std::vector<std::string>>> data;
+    std::ifstream hyponymStream(hyponymFile);
+    std::ifstream hypernymStream(hypernymFile);
+    std::string hyponymLine;
+    std::string hypernymLine;
+    while (std::getline(hyponymStream, hyponymLine) && std::getline(hypernymStream, hypernymLine)) {
+        std::string hyponym = hyponymLine.substr(0, hyponymLine.find('\t'));
+        std::vector<std::string> hypernyms;
+        std::string hypernym;
+        std::istringstream hypernymStream(hypernymLine);
+        while (std::getline(hypernymStream, hypernym, '\t')) {
+            hypernyms.emplace_back(hypernym);
+        }
+        data.emplace_back(hyponym, hypernyms);
+    }
+    return data;
+}
+
+
+
+std::vector<std::string> getDistractors(const std::string &target, int targetPos, std::set<std::string> &possibleDistractors, std::mt19937 &rnd) {
+    std::vector<std::string> distractors;
+    std::vector<std::string> possibleDistractorsVector(possibleDistractors.begin(), possibleDistractors.end());
+    std::shuffle(possibleDistractorsVector.begin(), possibleDistractorsVector.end(), rnd);
+    for (int i = 0; i < 3; i++) {
+        distractors.push_back(possibleDistractorsVector[i]);
+        possibleDistractors.erase(possibleDistractorsVector[i]);
+    }
+    distractors.insert(distractors.begin() + targetPos, target);
+    return distractors;
+
+}
+
+
+
+void createJson(const std::vector<std::pair<std::string, std::vector<std::string>>> &data, const std::string &outputFile, const std::set<std::string> &vocabulary) {
+    std::vector<nlohmann::json> jsonEntries;
+    int id = 0;
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_int_distribution<> distrib(0, 3);
+    for (const std::pair<std::string, std::vector<std::string>> &entry : data) {
+        std::set<std::string> targets;
+        targets.insert(entry.first);
+        for (const std::string &hypernym : entry.second) {
+            targets.insert(hypernym);
+        }
+        std::set<std::string> possibleDistractors = getPossibleDistractors(targets, vocabulary);
+        for (const std::string &hypernym : entry.second) {
+            int targetPos = distrib(gen);
+            nlohmann::json jsonEntry;
+            jsonEntry["id"] = id;
+            jsonEntry["text"] = entry.first;
+            jsonEntry["label"] = targetPos;
+            jsonEntry["choices"] = getDistractors(hypernym, targetPos, possibleDistractors, gen);
+            jsonEntries.push_back(jsonEntry);
+            id++;
+        }
+    }
+    std::ofstream jsonlFile(outputFile);
+    for (const nlohmann::json &item : jsonEntries) {
+        jsonlFile << item << std::endl;
+    }
+    jsonlFile.close();
+}
+
 int main(int argc, char *argv[]) {
+
+    if (argc < 4) {
+        std::cerr << "Usage: ./managing_data_task_26 <input_file1> <input_file2> <output_file>" << std::endl;
+        return 1;
+    }
+    std::string hyponymFile = argv[1];
+    std::string hypernymFile = argv[2];
+    std::string outputFile = argv[3];
     return 0;
 }
