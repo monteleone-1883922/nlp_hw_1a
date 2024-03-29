@@ -10,6 +10,7 @@ import pprint as pp
 import random as rnd
 import sys
 import numpy as np
+import fasttext.util
 
 SENTENCE_START = "_____"
 ENG_VOCABULARY_PATH = "data/eng_vocabulary.txt"
@@ -41,6 +42,7 @@ DECODE_TAGS = {
     "X": "altro"
 }
 MAX_COMMON_TAGS_TO_CONSIDER = 7
+NEAR_WORDS_TO_CONSIDER = 3
 
 
 def get_list_sentences(file_path):
@@ -66,10 +68,13 @@ def get_info_sentences(sentences):
         "num_sentences": len(sentences)
     }
     tags = {}
+    vocab = set()
     for sentence in sentences:
         for word in sentence[1:]:
+            vocab.add(word)
             tags[word[1]] = tags.get(word[1], 0) + 1
     sentences_info["tags"] = tags
+    sentences_info["vocab"] = vocab
     return sentences_info
 
 
@@ -79,28 +84,46 @@ def extract_most_common_tags(sentences_info):
     return [DECODE_TAGS[tag[0]] for tag in list_tags]
 
 
-def generate_distractors(word, tag, tag_position, most_common_tags_for_words, most_common_tags):
-    tag = DECODE_TAGS[tag]
-    tags_for_word = most_common_tags_for_words[word].copy()
+def get_similar_words(word, embeddings):
+    return embeddings.get_nearest_neighbors(word, k=NEAR_WORDS_TO_CONSIDER)
+
+
+def sample_tags(tags_for_word, tag, choices=[]):
     tags_for_word.pop(tag)
+    for distractor in choices:
+        tags_for_word.pop(distractor)
     if len(tags_for_word) != 0:
         tags_for_word = list(tags_for_word.items())
         elements, weights = zip(*tags_for_word)
         weights = np.array(weights, dtype=float)
         weights /= weights.sum()
-        choices = np.random.choice(elements, p=weights, size=min(len(elements), 3), replace=False).tolist()
+        return np.random.choice(elements, p=weights, size=min(len(elements), 3 - len(choices)), replace=False).tolist()
     else:
-        choices = []
+        return []
+
+
+def generate_distractors(word, tag, tag_position, most_common_tags_for_words, most_common_tags, embeddings):
+    tag = DECODE_TAGS[tag]
+    tags_for_word = most_common_tags_for_words[word].copy()
+    choices = sample_tags(tags_for_word, tag)
     if len(choices) < 3:
+        # find similar words
+        similar_words = get_similar_words(word, embeddings)
+        i = 0
+        len_choices = len(choices)
+        while len_choices < 3 and i < len(similar_words):
+            word = similar_words[i]
+            tags_for_word = most_common_tags_for_words[word].copy()
+            distractors = sample_tags(tags_for_word, tag, choices)
+            choices += distractors
+            len_choices = len(choices)
+            i += 1
+
         most_common_tags.remove(tag)
         for choice in choices:
             most_common_tags.remove(choice)
-        tmp = [i for i in range(MAX_COMMON_TAGS_TO_CONSIDER)]
-        rnd.shuffle(tmp)
-        l = len(choices)
-        for i in range(3 - l):
-            choice = most_common_tags[tmp[i]]
-            choices.append(choice)
+        distractors = rnd.sample(most_common_tags[:MAX_COMMON_TAGS_TO_CONSIDER], 3 - len(choices))
+        choices += distractors
     choices.insert(tag_position, tag)
     return choices
 
@@ -116,7 +139,8 @@ def find_repeated_words(sentences, write_output=False):
         for word in sentence[1:]:
             if word[0] in words and word not in words_and_tags:
                 dangerous_sentences.append(
-                    sentence_id + " | " + " ".join([word_[0] if word_[0] != word[0] else "##" + word_[0] for word_ in sentence[1:]]))
+                    sentence_id + " | " + " ".join(
+                        [word_[0] if word_[0] != word[0] else "##" + word_[0] for word_ in sentence[1:]]))
                 dangerous_sentences_idx.append(sentence_id)
                 dangerous_words[word[0]] = dangerous_words.get(word[0], 0) + 1
                 break
@@ -141,7 +165,8 @@ def find_english_words(sentences, write_output=False):
             if word[0].lower() in eng_words and word[1] != "PROPN":
                 words_found.add(word[0].lower())
                 suspected_sentences.append(
-                    sentence[0][0] + " | " + " ".join([word_[0] if word_[0] != word[0] else "##" + word_[0] for word_ in sentence[1:]]))
+                    sentence[0][0] + " | " + " ".join(
+                        [word_[0] if word_[0] != word[0] else "##" + word_[0] for word_ in sentence[1:]]))
                 suspected_sentences_idx.append(sentence[0][0])
                 break
     if write_output:
@@ -149,7 +174,6 @@ def find_english_words(sentences, write_output=False):
             for sentence in suspected_sentences:
                 file.write(sentence + "\n")
     return suspected_sentences, set(suspected_sentences_idx), words_found
-
 
 
 def build_common_tags_for_word(sentences):
@@ -162,10 +186,10 @@ def build_common_tags_for_word(sentences):
     return common_tags
 
 
-def create_json(sentences, file_name, sentences_to_remove=set()):
+def create_json(sentences, file_name, sentences_info, embeddings, sentences_to_remove=set()):
     json_sentences = []
     most_common_tags_for_words = build_common_tags_for_word(sentences)
-    most_common_tags = extract_most_common_tags(get_info_sentences(sentences))
+    most_common_tags = extract_most_common_tags(sentences_info)
     for sentence in sentences:
         sentence_id = sentence[0][0]
         if sentence_id not in sentences_to_remove:
@@ -178,7 +202,7 @@ def create_json(sentences, file_name, sentences_to_remove=set()):
                     "target_word": word[0],
                     "word_idx": i,
                     "choices": generate_distractors(word[0], word[1], label, most_common_tags_for_words,
-                                                    most_common_tags.copy()),
+                                                    most_common_tags.copy(), embeddings),
                     "label": label
                 }
                 json_sentences.append(sentence_dict)
@@ -188,24 +212,28 @@ def create_json(sentences, file_name, sentences_to_remove=set()):
             jsonl_file.write('\n')
 
 
+def remove_unnedded_embeddings(embeddings, words_to_remove):
+    new_embeddings = {}
+    for word in embeddings.words:
+        if word not in words_to_remove:
+            new_embeddings[word] = embeddings[word]
+    return new_embeddings
 
-if __name__ == '__main__':
+
+def main():
     if len(sys.argv) != 3:
         print("Usage: python managing_data_task_23.py <input_file> <output_file>")
         sys.exit(1)
     input_file = sys.argv[1]
     output_file = sys.argv[2]
-
+    fasttext.util.download_model('it', if_exists='ignore')  # Italian
+    embeddings = fasttext.load_model('cc.it.300.bin')
     sentences = get_list_sentences(input_file)
-    # comm_tags_word = build_common_tags_for_word(sentences)
-    # with open("test.txt", 'w', encoding='utf8') as file:
-    #     for key, value in comm_tags_word.items():
-    #         file.write(key + ": " + str(value) + "\n")
-    # suspected_sentences, suspected_sentence_idx, words_found = find_english_words(sentences, write_output=True)
-    # print(words_found)
+    sentences_info = get_info_sentences(sentences)
+    embeddings = remove_unnedded_embeddings(embeddings, sentences_info["vocab"])
     dangerous_sentences, dangerous_sentences_idx, dangerous_words = find_repeated_words(sentences)
-    create_json(sentences, output_file, sentences_to_remove=dangerous_sentences_idx)
-    # info = get_info_sentences(sentences)
-    # print(extract_most_common_tags(info))
-    # pp.pprint(info)
+    create_json(sentences, output_file, sentences_info, embeddings, sentences_to_remove=dangerous_sentences_idx)
 
+
+if __name__ == '__main__':
+    main()
