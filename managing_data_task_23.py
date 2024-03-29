@@ -85,7 +85,7 @@ def extract_most_common_tags(sentences_info):
 
 
 def get_similar_words(word, embeddings):
-    return embeddings.get_nearest_neighbors(word, k=NEAR_WORDS_TO_CONSIDER)
+    return [word[1] for word in embeddings.get_nearest_neighbors(word, k=NEAR_WORDS_TO_CONSIDER)]
 
 
 def sample_tags(tags_for_word, tag, choices=[]):
