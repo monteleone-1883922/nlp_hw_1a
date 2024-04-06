@@ -1,12 +1,4 @@
-"""
-- struttura json finale:  { "sentence_id": ..., "sentence": ..., "target_word":
-    ..., "word_idx": ..., "choices": [...], "label": ... }
-- eliminare parole duplicate in stessa frase
-- dividere parole della frase in diverse entries del json
-- eliminare parole straniere
-"""
 import json
-import pprint as pp
 import random as rnd
 import sys
 import numpy as np
@@ -43,6 +35,7 @@ DECODE_TAGS = {
 }
 MAX_COMMON_TAGS_TO_CONSIDER = 7
 NEAR_WORDS_TO_CONSIDER = 3
+NEIGBORDS_POOL = 10
 
 
 def get_list_sentences(file_path):
@@ -71,7 +64,7 @@ def get_info_sentences(sentences):
     vocab = set()
     for sentence in sentences:
         for word in sentence[1:]:
-            vocab.add(word)
+            vocab.add(word[0])
             tags[word[1]] = tags.get(word[1], 0) + 1
     sentences_info["tags"] = tags
     sentences_info["vocab"] = vocab
@@ -84,8 +77,15 @@ def extract_most_common_tags(sentences_info):
     return [DECODE_TAGS[tag[0]] for tag in list_tags]
 
 
-def get_similar_words(word, embeddings):
-    return [word[1] for word in embeddings.get_nearest_neighbors(word, k=NEAR_WORDS_TO_CONSIDER)]
+def get_similar_words(word, embeddings, vocabulary):
+    neighbors = embeddings.get_nearest_neighbors(word, k=NEIGBORDS_POOL)
+    similar_words = []
+    for neighbor in neighbors:
+        if neighbor in vocabulary:
+            similar_words.append(neighbor)
+        if len(similar_words) == NEAR_WORDS_TO_CONSIDER:
+            break
+    return similar_words
 
 
 def sample_tags(tags_for_word, tag, choices=[]):
@@ -102,18 +102,18 @@ def sample_tags(tags_for_word, tag, choices=[]):
         return []
 
 
-def generate_distractors(word, tag, tag_position, most_common_tags_for_words, most_common_tags, embeddings):
+def generate_distractors(word, tag, tag_position, most_common_tags_for_words, most_common_tags, embeddings, vocabulary):
     tag = DECODE_TAGS[tag]
-    tags_for_word = most_common_tags_for_words[word].copy()
+    tags_for_word = most_common_tags_for_words[word.lower()].copy()
     choices = sample_tags(tags_for_word, tag)
     if len(choices) < 3:
         # find similar words
-        similar_words = get_similar_words(word, embeddings)
+        similar_words = get_similar_words(word, embeddings, vocabulary)
         i = 0
         len_choices = len(choices)
         while len_choices < 3 and i < len(similar_words):
             word = similar_words[i]
-            tags_for_word = most_common_tags_for_words[word].copy()
+            tags_for_word = most_common_tags_for_words[word.lower()].copy()
             distractors = sample_tags(tags_for_word, tag, choices)
             choices += distractors
             len_choices = len(choices)
@@ -202,7 +202,7 @@ def create_json(sentences, file_name, sentences_info, embeddings, sentences_to_r
                     "target_word": word[0],
                     "word_idx": i,
                     "choices": generate_distractors(word[0], word[1], label, most_common_tags_for_words,
-                                                    most_common_tags.copy(), embeddings),
+                                                    most_common_tags.copy(), embeddings, sentences_info["vocab"]),
                     "label": label
                 }
                 json_sentences.append(sentence_dict)
@@ -212,12 +212,16 @@ def create_json(sentences, file_name, sentences_info, embeddings, sentences_to_r
             jsonl_file.write('\n')
 
 
-def remove_unnedded_embeddings(embeddings, words_to_remove):
-    new_embeddings = {}
-    for word in embeddings.words:
-        if word not in words_to_remove:
-            new_embeddings[word] = embeddings[word]
-    return new_embeddings
+
+
+
+def remove_sentences(sentences, sentences_to_remove):
+    new_sentences = []
+    for sentence in sentences:
+        sentence_id = sentence[0][0]
+        if sentence_id not in sentences_to_remove:
+            new_sentences.append(sentence)
+    return new_sentences
 
 
 def main():
@@ -229,10 +233,10 @@ def main():
     fasttext.util.download_model('it', if_exists='ignore')  # Italian
     embeddings = fasttext.load_model('cc.it.300.bin')
     sentences = get_list_sentences(input_file)
-    sentences_info = get_info_sentences(sentences)
-    embeddings = remove_unnedded_embeddings(embeddings, sentences_info["vocab"])
     dangerous_sentences, dangerous_sentences_idx, dangerous_words = find_repeated_words(sentences)
-    create_json(sentences, output_file, sentences_info, embeddings, sentences_to_remove=dangerous_sentences_idx)
+    sentences = remove_sentences(sentences, dangerous_sentences_idx)
+    sentences_info = get_info_sentences(sentences)
+    create_json(sentences, output_file, sentences_info, embeddings)
 
 
 if __name__ == '__main__':
