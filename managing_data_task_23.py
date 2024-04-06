@@ -35,7 +35,7 @@ DECODE_TAGS = {
 }
 MAX_COMMON_TAGS_TO_CONSIDER = 7
 NEAR_WORDS_TO_CONSIDER = 3
-NEIGBORDS_POOL = 10
+NEIGHBORS_POOL = 10
 
 
 def get_list_sentences(file_path):
@@ -78,7 +78,7 @@ def extract_most_common_tags(sentences_info):
 
 
 def get_similar_words(word, embeddings, vocabulary):
-    neighbors = embeddings.get_nearest_neighbors(word, k=NEIGBORDS_POOL)
+    neighbors = embeddings.get_nearest_neighbors(word, k=NEIGHBORS_POOL)
     similar_words = []
     for neighbor in neighbors:
         if neighbor in vocabulary:
@@ -186,11 +186,19 @@ def build_common_tags_for_word(sentences):
     return common_tags
 
 
+def print_progress_bar(percentuale, lunghezza_barra=100):
+    blocchi_compilati = int(lunghezza_barra * percentuale)
+    barra = "[" + "=" * (blocchi_compilati - 1) + ">" + " " * (lunghezza_barra - blocchi_compilati) + "]"
+    sys.stdout.write(f"\r{barra} {percentuale * 100:.2f}% completo")
+    sys.stdout.flush()
+
+
 def create_json(sentences, file_name, sentences_info, embeddings, sentences_to_remove=set()):
     json_sentences = []
     most_common_tags_for_words = build_common_tags_for_word(sentences)
     most_common_tags = extract_most_common_tags(sentences_info)
-    for sentence in sentences:
+    for j, sentence in enumerate(sentences):
+        print_progress_bar(j / len(sentences))
         sentence_id = sentence[0][0]
         if sentence_id not in sentences_to_remove:
             sentence_text = " ".join([word[0] for word in sentence[1:]])
@@ -210,9 +218,6 @@ def create_json(sentences, file_name, sentences_info, embeddings, sentences_to_r
         for item in json_sentences:
             json.dump(item, jsonl_file)  # Scrivi l'oggetto JSON
             jsonl_file.write('\n')
-
-
-
 
 
 def remove_sentences(sentences, sentences_to_remove):
