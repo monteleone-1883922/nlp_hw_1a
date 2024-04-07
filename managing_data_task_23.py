@@ -1,8 +1,12 @@
 import json
 import random as rnd
 import sys
+import time
+
 import numpy as np
 import fasttext.util
+from heapq import heappop, heappush, heapify
+from sklearn.metrics.pairwise import cosine_similarity
 
 SENTENCE_START = "_____"
 ENG_VOCABULARY_PATH = "data/eng_vocabulary.txt"
@@ -76,6 +80,21 @@ def extract_most_common_tags(sentences_info):
     list_tags.sort(key=lambda x: x[1], reverse=True)
     return [DECODE_TAGS[tag[0]] for tag in list_tags]
 
+def find_nearest_neighbors(target, embeddings):
+    neighbors = []
+    heap = []
+    heapify(heap)
+    for word in embeddings.keys():
+        similarity = cosine_similarity(embeddings[target], embeddings[word])
+        if len(heap) < NEAR_WORDS_TO_CONSIDER:
+            heappush(heap, ( similarity, word))
+        elif similarity > heap[NEAR_WORDS_TO_CONSIDER-1][0]:
+            heappop(heap)
+            heappush(heap, ( similarity, word))
+    for word in heap:
+        neighbors.append(word[1])
+    return neighbors
+
 
 def get_similar_words(word, embeddings, vocabulary):
     neighbors = embeddings.get_nearest_neighbors(word, k=NEIGHBORS_POOL)
@@ -89,9 +108,10 @@ def get_similar_words(word, embeddings, vocabulary):
 
 
 def sample_tags(tags_for_word, tag, choices=[]):
-    tags_for_word.pop(tag)
+
+    tags_for_word.pop(tag, None)
     for distractor in choices:
-        tags_for_word.pop(distractor)
+        tags_for_word.pop(distractor, None)
     if len(tags_for_word) != 0:
         tags_for_word = list(tags_for_word.items())
         elements, weights = zip(*tags_for_word)
@@ -102,13 +122,13 @@ def sample_tags(tags_for_word, tag, choices=[]):
         return []
 
 
-def generate_distractors(word, tag, tag_position, most_common_tags_for_words, most_common_tags, embeddings, vocabulary):
+def generate_distractors(word, tag, tag_position, most_common_tags_for_words, most_common_tags, embeddings, vocabulary=None):
     tag = DECODE_TAGS[tag]
     tags_for_word = most_common_tags_for_words[word.lower()].copy()
     choices = sample_tags(tags_for_word, tag)
     if len(choices) < 3:
         # find similar words
-        similar_words = get_similar_words(word, embeddings, vocabulary)
+        similar_words = find_nearest_neighbors(word,embeddings) #get_similar_words(word, embeddings, vocabulary)
         i = 0
         len_choices = len(choices)
         while len_choices < 3 and i < len(similar_words):
@@ -197,8 +217,11 @@ def create_json(sentences, file_name, sentences_info, embeddings, sentences_to_r
     json_sentences = []
     most_common_tags_for_words = build_common_tags_for_word(sentences)
     most_common_tags = extract_most_common_tags(sentences_info)
+    tmp = 0
     for j, sentence in enumerate(sentences):
         print_progress_bar(j / len(sentences))
+        print(time.time() - tmp)
+        tmp = time.time()
         sentence_id = sentence[0][0]
         if sentence_id not in sentences_to_remove:
             sentence_text = " ".join([word[0] for word in sentence[1:]])
@@ -210,7 +233,7 @@ def create_json(sentences, file_name, sentences_info, embeddings, sentences_to_r
                     "target_word": word[0],
                     "word_idx": i,
                     "choices": generate_distractors(word[0], word[1], label, most_common_tags_for_words,
-                                                    most_common_tags.copy(), embeddings, sentences_info["vocab"]),
+                                                    most_common_tags.copy(), embeddings),
                     "label": label
                 }
                 json_sentences.append(sentence_dict)
@@ -229,6 +252,12 @@ def remove_sentences(sentences, sentences_to_remove):
     return new_sentences
 
 
+def build_embedding_vocab(embeddings, vocabulary):
+    embedding_vocab = {}
+    for word in vocabulary:
+        embedding_vocab[word] = embeddings.get_word_vector(word).reshape(1, -1)
+    return embedding_vocab
+
 def main():
     if len(sys.argv) != 3:
         print("Usage: python managing_data_task_23.py <input_file> <output_file>")
@@ -241,6 +270,7 @@ def main():
     dangerous_sentences, dangerous_sentences_idx, dangerous_words = find_repeated_words(sentences)
     sentences = remove_sentences(sentences, dangerous_sentences_idx)
     sentences_info = get_info_sentences(sentences)
+    embeddings = build_embedding_vocab(embeddings, sentences_info["vocab"])
     create_json(sentences, output_file, sentences_info, embeddings)
 
 
