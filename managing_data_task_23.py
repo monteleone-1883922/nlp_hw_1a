@@ -360,6 +360,7 @@ def main():
     dangerous_sentences_idx = mapping.reduce(lambda x, y: x.union(y))
     # dangerous_sentences, dangerous_sentences_idx, dangerous_words = find_repeated_words(sentences)
     sentences = sentences.filter(lambda x: x[0][0] not in dangerous_sentences_idx)
+    sentences_list = sentences.collect()
     # sentences = remove_sentences(sentences, dangerous_sentences_idx)
     sentences_info = get_info_sentences(sentences_list)
     embeddings = build_embedding_vocab(embeddings, sentences_info["vocab"])
