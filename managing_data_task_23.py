@@ -2,7 +2,7 @@ import json
 import random as rnd
 import sys
 import time
-
+import editdistance
 import numpy as np
 import fasttext.util
 from heapq import heappop, heappush, heapify
@@ -40,6 +40,7 @@ DECODE_TAGS = {
 MAX_COMMON_TAGS_TO_CONSIDER = 7
 NEAR_WORDS_TO_CONSIDER = 3
 NEIGHBORS_POOL = 10
+SWAP_PROB = 0.4
 
 
 def get_list_sentences(file_path):
@@ -58,6 +59,15 @@ def get_list_sentences(file_path):
                 sentence.append(pair)
         sentences.append(sentence)
     return sentences
+
+
+def generate_similar_words_vocab(vocabulary, tags_for_word,embeddings=None, use_fasttext=False, use_embeddings=False):
+    similar_words = {}
+    for i, word in enumerate(vocabulary):
+        print_progress_bar(i / len(vocabulary))
+        if len(tags_for_word[word.lower()]) < 4:
+            similar_words[word] = get_similar_words(word, embeddings, vocabulary) if use_fasttext else find_nearest_neighbors(word, embeddings, use_embeddings)
+    return similar_words
 
 
 def get_info_sentences(sentences):
@@ -80,17 +90,19 @@ def extract_most_common_tags(sentences_info):
     list_tags.sort(key=lambda x: x[1], reverse=True)
     return [DECODE_TAGS[tag[0]] for tag in list_tags]
 
-def find_nearest_neighbors(target, embeddings):
+
+def find_nearest_neighbors(target, embeddings, use_embeddings=False):
     neighbors = []
     heap = []
     heapify(heap)
     for word in embeddings.keys():
-        similarity = cosine_similarity(embeddings[target], embeddings[word])
+        similarity = cosine_similarity(embeddings[target],
+                                       embeddings[word]) if use_embeddings else -1 * editdistance.eval(target, word)
         if len(heap) < NEAR_WORDS_TO_CONSIDER:
-            heappush(heap, ( similarity, word))
-        elif similarity > heap[NEAR_WORDS_TO_CONSIDER-1][0]:
+            heappush(heap, (similarity, word))
+        elif similarity < heap[0][0] or (use_embeddings and similarity > heap[0][0]):
             heappop(heap)
-            heappush(heap, ( similarity, word))
+            heappush(heap, (similarity, word))
     for word in heap:
         neighbors.append(word[1])
     return neighbors
@@ -108,7 +120,6 @@ def get_similar_words(word, embeddings, vocabulary):
 
 
 def sample_tags(tags_for_word, tag, choices=[]):
-
     tags_for_word.pop(tag, None)
     for distractor in choices:
         tags_for_word.pop(distractor, None)
@@ -122,13 +133,19 @@ def sample_tags(tags_for_word, tag, choices=[]):
         return []
 
 
-def generate_distractors(word, tag, tag_position, most_common_tags_for_words, most_common_tags, embeddings, vocabulary=None):
+def generate_distractors(word, tag, tag_position, most_common_tags_for_words, most_common_tags, similar_words):
     tag = DECODE_TAGS[tag]
     tags_for_word = most_common_tags_for_words[word.lower()].copy()
     choices = sample_tags(tags_for_word, tag)
+    if len(tags_for_word) > 3 and rnd.random() < SWAP_PROB / (len(tags_for_word) - 3):
+        most_common_tags.remove(tag)
+        for choice in choices:
+            most_common_tags.remove(choice)
+        swap = rnd.sample(most_common_tags[:MAX_COMMON_TAGS_TO_CONSIDER], 1)[0]
+        choices[rnd.randint(0,2)] = swap
     if len(choices) < 3:
         # find similar words
-        similar_words = find_nearest_neighbors(word,embeddings) #get_similar_words(word, embeddings, vocabulary)
+        similar_words = similar_words[word] #find_nearest_neighbors(word, embeddings)  # get_similar_words(word, embeddings, vocabulary)
         i = 0
         len_choices = len(choices)
         while len_choices < 3 and i < len(similar_words):
@@ -213,15 +230,14 @@ def print_progress_bar(percentuale, lunghezza_barra=100):
     sys.stdout.flush()
 
 
-def create_json(sentences, file_name, sentences_info, embeddings, sentences_to_remove=set()):
+def create_json(sentences, file_name, sentences_info, similar_words, sentences_to_remove=set(), most_common_tags_for_words=None, most_common_tags=None):
     json_sentences = []
-    most_common_tags_for_words = build_common_tags_for_word(sentences)
-    most_common_tags = extract_most_common_tags(sentences_info)
-    tmp = 0
+    if most_common_tags_for_words is None:
+        most_common_tags_for_words = build_common_tags_for_word(sentences)
+    if most_common_tags is None:
+        most_common_tags = extract_most_common_tags(sentences_info)
     for j, sentence in enumerate(sentences):
         print_progress_bar(j / len(sentences))
-        print(time.time() - tmp)
-        tmp = time.time()
         sentence_id = sentence[0][0]
         if sentence_id not in sentences_to_remove:
             sentence_text = " ".join([word[0] for word in sentence[1:]])
@@ -233,7 +249,7 @@ def create_json(sentences, file_name, sentences_info, embeddings, sentences_to_r
                     "target_word": word[0],
                     "word_idx": i,
                     "choices": generate_distractors(word[0], word[1], label, most_common_tags_for_words,
-                                                    most_common_tags.copy(), embeddings),
+                                                    most_common_tags.copy(), similar_words),
                     "label": label
                 }
                 json_sentences.append(sentence_dict)
@@ -258,6 +274,7 @@ def build_embedding_vocab(embeddings, vocabulary):
         embedding_vocab[word] = embeddings.get_word_vector(word).reshape(1, -1)
     return embedding_vocab
 
+
 def main():
     if len(sys.argv) != 3:
         print("Usage: python managing_data_task_23.py <input_file> <output_file>")
@@ -271,7 +288,9 @@ def main():
     sentences = remove_sentences(sentences, dangerous_sentences_idx)
     sentences_info = get_info_sentences(sentences)
     embeddings = build_embedding_vocab(embeddings, sentences_info["vocab"])
-    create_json(sentences, output_file, sentences_info, embeddings)
+    most_common_tags_for_word = build_common_tags_for_word(sentences)
+    similar_words = generate_similar_words_vocab(sentences_info["vocab"],most_common_tags_for_word , embeddings, use_fasttext=False, use_embeddings=True)
+    create_json(sentences, output_file, sentences_info, similar_words, most_common_tags_for_words=most_common_tags_for_word)
 
 
 if __name__ == '__main__':
