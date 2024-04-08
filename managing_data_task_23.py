@@ -9,9 +9,10 @@ from heapq import heappop, heappush, heapify
 from sklearn.metrics.pairwise import cosine_similarity
 import pyspark as pk
 
+# Definition of constants
 SENTENCE_START = "_____"
 ENG_VOCABULARY_PATH = "data/eng_vocabulary.txt"
-
+# Mapping of from categorical to natural language labels
 DECODE_TAGS = {
     "ADJ": "aggettivo",
     "AD": "aggettivo",
@@ -47,7 +48,9 @@ SWAP_PROB = 0.4
 THRESHOLD = 7
 
 
-def get_list_sentences(file_path):
+# This function reads the input file and returns a list of sentences.
+# Each sentence is a list of tuples, where each tuple contains a word and its tag.
+def get_list_sentences(file_path: str) -> list[list[tuple[str, str]]]:
     with open(file_path, 'r', encoding='utf8') as file:
         sentences = []
         first_line = True
@@ -65,23 +68,25 @@ def get_list_sentences(file_path):
     return sentences
 
 
-def generate_similar_words_vocab(vocabulary, tags_for_word, embeddings=None, use_fasttext=False, use_embeddings=False,
-                                 progress_bar=False):
+# Function to generate similar words vocabulary in single thread execution
+def generate_similar_words_vocab(vocabulary: set[str], tags_for_word: dict[str, dict[str, int]], embeddings=None,
+                                 use_fasttext: bool = False, use_embeddings: bool = False,
+                                 progress_bar=False) -> dict[str, list[str]]:
     similar_words = {}
     for i, word in enumerate(vocabulary):
         if progress_bar:
             print_progress_bar(i / len(vocabulary))
-        if len(tags_for_word[word.lower()]) < 4:
-            similar_words[word] = get_similar_words(word, embeddings,
-                                                    vocabulary) if use_fasttext else find_nearest_neighbors(word,
-                                                                                                            embeddings,
-                                                                                                            use_embeddings)
+        update = generate_similar_words_vocab_map(word, vocabulary, tags_for_word, embeddings, use_fasttext, False,
+                                                  use_embeddings)
+        similar_words.update(update)
     return similar_words
 
 
-def generate_similar_words_vocab_map(word, vocabulary, tags_for_word, embeddings=None, use_fasttext=False,
-                                     use_embeddings=False, progress_bar=False):
-    if use_fasttext:
+# Function to generate similar words vocabulary, used in spark execution and as block for the single thread function
+def generate_similar_words_vocab_map(word: str, vocabulary: set[str], tags_for_word: dict[str, dict[str, int]],
+                                     embeddings=None, use_fasttext: bool = False, load_embeddings: bool = True,
+                                     use_embeddings: bool = False) -> dict[str, list[str]]:
+    if use_fasttext and load_embeddings:
         embeddings = fasttext.load_model('cc.it.300.bin')
     similar_words = {}
     if len(tags_for_word[word.lower()]) < 4:
@@ -92,7 +97,8 @@ def generate_similar_words_vocab_map(word, vocabulary, tags_for_word, embeddings
     return similar_words
 
 
-def get_info_sentences(sentences):
+# Function to get information about sentences, tags and vocabulary of words in sentences
+def get_info_sentences(sentences: list[list[tuple[str, str]]]) -> dict:
     sentences_info = {
         "num_sentences": len(sentences)
     }
@@ -107,13 +113,15 @@ def get_info_sentences(sentences):
     return sentences_info
 
 
-def extract_most_common_tags(sentences_info):
+# Function to extract most common tags
+def extract_most_common_tags(sentences_info: dict) -> list[str]:
     list_tags = list(sentences_info["tags"].items())
     list_tags.sort(key=lambda x: x[1], reverse=True)
     return [DECODE_TAGS[tag[0]] for tag in list_tags]
 
 
-def find_nearest_neighbors(target, embeddings, use_embeddings=False):
+# Function to find nearest neighbors of a target word using cosine similarity or edit distance
+def find_nearest_neighbors(target: str, embeddings: dict = None, use_embeddings: bool = False) -> list[str]:
     neighbors = []
     heap = []
     heapify(heap)
@@ -130,7 +138,8 @@ def find_nearest_neighbors(target, embeddings, use_embeddings=False):
     return neighbors
 
 
-def get_similar_words(word, embeddings, vocabulary):
+# Function to get similar words to a target word using fasttext embeddings
+def get_similar_words(word: str, embeddings, vocabulary: set[str]) -> list[str]:
     neighbors = embeddings.get_nearest_neighbors(word, k=NEIGHBORS_POOL)
     similar_words = []
     for neighbor in neighbors:
@@ -141,7 +150,8 @@ def get_similar_words(word, embeddings, vocabulary):
     return similar_words
 
 
-def sample_tags(tags_for_word, tag, choices=[]):
+# Function to sample tags depending on their frequency
+def sample_tags(tags_for_word: dict[str, int], tag: str, choices: list[str] = []) -> list[str]:
     tags_for_word.pop(tag, None)
     for distractor in choices:
         tags_for_word.pop(distractor, None)
@@ -155,7 +165,9 @@ def sample_tags(tags_for_word, tag, choices=[]):
         return []
 
 
-def generate_distractors(word, tag, tag_position, most_common_tags_for_words, most_common_tags, similar_words):
+# Function to generate distractors for a target word
+def generate_distractors(word: str, tag: str, tag_position: int, most_common_tags_for_words: dict[str, dict[str, int]],
+                         most_common_tags: list[str], similar_words: dict[str, list[str]]) -> list[str]:
     tag = DECODE_TAGS[tag]
     tags_for_word = most_common_tags_for_words[word.lower()].copy()
     choices = sample_tags(tags_for_word, tag)
@@ -168,7 +180,7 @@ def generate_distractors(word, tag, tag_position, most_common_tags_for_words, mo
     if len(choices) < 3:
         # find similar words
         similar_words = similar_words[
-            word]  #find_nearest_neighbors(word, embeddings)  # get_similar_words(word, embeddings, vocabulary)
+            word]  # find_nearest_neighbors(word, embeddings)  # get_similar_words(word, embeddings, vocabulary)
         i = 0
         len_choices = len(choices)
         while len_choices < 3 and i < len(similar_words):
@@ -188,7 +200,9 @@ def generate_distractors(word, tag, tag_position, most_common_tags_for_words, mo
     return choices
 
 
-def find_repeated_words(sentences, write_output=False):
+# Function to find repeated words in sentences and write them out if needed
+def find_repeated_words(sentences: list[list[tuple[str, str]]], write_output: bool = False) -> tuple[
+    list[str], set[str], dict[str, int]]:
     dangerous_sentences = []
     dangerous_sentences_idx = []
     dangerous_words = {}
@@ -214,16 +228,15 @@ def find_repeated_words(sentences, write_output=False):
     return dangerous_sentences, set(dangerous_sentences_idx), dangerous_words
 
 
-def find_repeated_words_map(sentence):
+# Function to find repeated words in a spark friendly version
+def find_repeated_words_map(sentence: list[list[tuple[str, str]]]) -> set[tuple[str, str]]:
     dangerous_sentences_idx = []
     sentence_id = sentence[0][0]
     words = set()
     words_and_tags = set()
     for word in sentence[1:]:
         if word[0] in words and word not in words_and_tags:
-
             dangerous_sentences_idx.append(sentence_id)
-
             break
         else:
             words.add(word[0])
@@ -231,7 +244,9 @@ def find_repeated_words_map(sentence):
     return set(dangerous_sentences_idx)
 
 
-def find_english_words(sentences, write_output=False):
+# Function to find English words in sentences and write them out if needed
+def find_english_words(sentences: list[list[tuple[str, str]]], write_output: bool = False) -> tuple[
+    list[str], set[str], set[str]]:
     suspected_sentences = []
     suspected_sentences_idx = []
     words_found = set()
@@ -253,7 +268,8 @@ def find_english_words(sentences, write_output=False):
     return suspected_sentences, set(suspected_sentences_idx), words_found
 
 
-def build_common_tags_for_word(sentences):
+# Function to builda dictionary containing all tags used for each word
+def build_common_tags_for_word(sentences: list[list[tuple[str, str]]]) -> dict[str, dict[str, int]]:
     common_tags = {}
     for sentence in sentences:
         for word in sentence[1:]:
@@ -263,15 +279,19 @@ def build_common_tags_for_word(sentences):
     return common_tags
 
 
-def print_progress_bar(percentuale, lunghezza_barra=100):
+# Function to print a progress bar
+def print_progress_bar(percentuale: float, lunghezza_barra: int = 30) -> None:
     blocchi_compilati = int(lunghezza_barra * percentuale)
     barra = "[" + "=" * (blocchi_compilati - 1) + ">" + " " * (lunghezza_barra - blocchi_compilati) + "]"
     sys.stdout.write(f"\r{barra} {percentuale * 100:.2f}% completo")
     sys.stdout.flush()
 
 
-def create_json_entries_from_sentences(sentences, similar_words, sentences_to_remove=set(),
-                                       most_common_tags_for_words=None, most_common_tags=None, sentences_info=None):
+# Function to create JSON entries from sentences
+def create_json_entries_from_sentences(sentences: list[list[tuple[str, str]]], similar_words: dict[str, list[str]],
+                                       sentences_to_remove=set(),
+                                       most_common_tags_for_words: dict[str, dict[str, int]] = None,
+                                       most_common_tags: list[str] = None, sentences_info: dict = None) -> list[dict]:
     json_sentences = []
     if most_common_tags_for_words is None:
         most_common_tags_for_words = build_common_tags_for_word(sentences)
@@ -284,8 +304,10 @@ def create_json_entries_from_sentences(sentences, similar_words, sentences_to_re
     return json_sentences
 
 
-def create_json_entries(sentence, similar_words, most_common_tags_for_words, most_common_tags,
-                        sentences_to_remove=set()):
+# Function to create JSON entries from a single sentence
+def create_json_entries(sentence: list[tuple[str, str]], similar_words: dict[str, list[str]],
+                        most_common_tags_for_words: dict[str, dict[str, int]], most_common_tags: list[str],
+                        sentences_to_remove: set[str] = set()) -> list[dict]:
     json_sentences = []
     sentence_id = sentence[0][0]
     if sentence_id not in sentences_to_remove:
@@ -305,14 +327,17 @@ def create_json_entries(sentence, similar_words, most_common_tags_for_words, mos
     return json_sentences
 
 
-def write_json(json_sentences, file_name):
+# Function to write JSON entries to a file
+def write_json(json_sentences: list[dict], file_name: str) -> None:
     with open(file_name, 'w', encoding='utf8') as jsonl_file:
         for item in json_sentences:
             json.dump(item, jsonl_file)  # Scrivi l'oggetto JSON
             jsonl_file.write('\n')
 
 
-def remove_sentences(sentences, sentences_to_remove):
+# Function to remove sentences from a list
+def remove_sentences(sentences: list[list[tuple[str, str]]], sentences_to_remove: set[str]) -> list[
+    list[tuple[str, str]]]:
     new_sentences = []
     for sentence in sentences:
         sentence_id = sentence[0][0]
@@ -321,14 +346,16 @@ def remove_sentences(sentences, sentences_to_remove):
     return new_sentences
 
 
-def build_embedding_vocab(embeddings, vocabulary):
+# Function to build embedding vocabulary
+def build_embedding_vocab(embeddings, vocabulary: set[str]) -> dict[str, np.ndarray]:
     embedding_vocab = {}
     for word in vocabulary:
         embedding_vocab[word] = embeddings.get_word_vector(word).reshape(1, -1)
     return embedding_vocab
 
 
-def common_tags_for_word(sentence):
+# Function to get common tags for a single word
+def common_tags_for_word(sentence: list[tuple[str, str]]) -> dict[str, dict[str, int]]:
     common_tags = {}
     for word in sentence:
         tags_word = common_tags.get(word[0].lower(), {})
@@ -337,7 +364,8 @@ def common_tags_for_word(sentence):
     return common_tags
 
 
-def merge_dicts(x, y):
+# Function to merge dictionaries used in spark reduce function
+def merge_dicts(x: dict, y: dict) -> dict:
     z = {}
     for key in set(x.keys()).union(set(y.keys())):
         tags_x = x.get(key, {})
@@ -347,7 +375,9 @@ def merge_dicts(x, y):
     return z
 
 
-def spark_execution(sentences_list, partitions, use_embeddings, use_fasttext=False):
+# Function to execute the code for creating the reformed dataset using multiple threads
+def spark_execution(sentences_list: list[list[tuple[str, str]]], partitions: int, use_embeddings: bool,
+                    use_fasttext: bool = False) -> list[dict]:
     sc = pk.SparkContext("local[*]")
     sentences = sc.parallelize(sentences_list, partitions)
     mapping = sentences.map(lambda x: find_repeated_words_map(x))
@@ -378,7 +408,9 @@ def spark_execution(sentences_list, partitions, use_embeddings, use_fasttext=Fal
     return json_sentences
 
 
-def single_thread_execution(sentences, use_embeddings=False, use_fasttext=False):
+# Function to execute the code for creating the reformed dataset using a single thread
+def single_thread_execution(sentences: list[list[tuple[str, str]]], use_embeddings: bool = False,
+                            use_fasttext: bool = False) -> list[dict]:
     dangerous_sentences, dangerous_sentences_idx, dangerous_words = find_repeated_words(sentences)
     sentences = remove_sentences(sentences, dangerous_sentences_idx)
     sentences_info = get_info_sentences(sentences)
@@ -391,14 +423,16 @@ def single_thread_execution(sentences, use_embeddings=False, use_fasttext=False)
     most_common_tags_for_word = build_common_tags_for_word(sentences)
     most_common_tags = extract_most_common_tags(sentences_info)
     similar_words = generate_similar_words_vocab(sentences_info["vocab"], most_common_tags_for_word, embeddings,
-                                                 use_fasttext=use_fasttext, use_embeddings=use_embeddings, progress_bar=True)
+                                                 use_fasttext=use_fasttext, use_embeddings=use_embeddings,
+                                                 progress_bar=True)
     json_entries = create_json_entries_from_sentences(sentences, similar_words,
                                                       most_common_tags_for_words=most_common_tags_for_word,
                                                       most_common_tags=most_common_tags)
     return json_entries
 
 
-def main():
+# Main function
+def main() -> None:
     if len(sys.argv) != 4:
         print("Usage: python managing_data_task_23.py <input_file> <output_file> <partitions> [<similarity_method>]")
         sys.exit(1)
@@ -416,9 +450,11 @@ def main():
         print("Invalid similarity method, valid values are: 'editdistance', 'cosine_similarity' and 'fasttext'")
         sys.exit(1)
     if partitions == 1:
-        json_sentences = single_thread_execution(sentences_list,use_embeddings=use_embeddings,use_fasttext=use_fasttext)
+        json_sentences = single_thread_execution(sentences_list, use_embeddings=use_embeddings,
+                                                 use_fasttext=use_fasttext)
     else:
-        json_sentences = spark_execution(sentences_list, partitions, use_embeddings=use_embeddings, use_fasttext=use_fasttext)
+        json_sentences = spark_execution(sentences_list, partitions, use_embeddings=use_embeddings,
+                                         use_fasttext=use_fasttext)
 
     write_json(json_sentences, output_file)
 
