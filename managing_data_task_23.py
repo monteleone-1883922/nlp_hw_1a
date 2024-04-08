@@ -347,7 +347,7 @@ def merge_dicts(x, y):
     return z
 
 
-def spark_execution(sentences_list, partitions, use_embeddings):
+def spark_execution(sentences_list, partitions, use_embeddings, use_fasttext=False):
     sc = pk.SparkContext("local[*]")
     sentences = sc.parallelize(sentences_list, partitions)
     mapping = sentences.map(lambda x: find_repeated_words_map(x))
@@ -356,17 +356,18 @@ def spark_execution(sentences_list, partitions, use_embeddings):
     sentences_list = sentences.collect()
     sentences_info = get_info_sentences(sentences_list)
     embeddings = None
-    if use_embeddings:
+    if use_embeddings or use_fasttext:
         fasttext.util.download_model('it', if_exists='ignore')
         embeddings = fasttext.load_model('cc.it.300.bin')
-        embeddings = build_embedding_vocab(embeddings, sentences_info["vocab"])
+        if use_embeddings:
+            embeddings = build_embedding_vocab(embeddings, sentences_info["vocab"])
     mapping = sentences.map(lambda x: common_tags_for_word(x[1:]))
     most_common_tags_for_word = mapping.reduce(lambda x, y: merge_dicts(x, y))
     most_common_tags = extract_most_common_tags(sentences_info)
     vocab = sc.parallelize(sentences_info["vocab"], partitions)
     mapping = vocab.map(
         lambda x: generate_similar_words_vocab_map(x, sentences_info["vocab"], most_common_tags_for_word, embeddings,
-                                                   use_embeddings=use_embeddings))
+                                                   use_embeddings=use_embeddings, use_fasttext=use_fasttext))
     print("generating similar words")
     similar_words = mapping.reduce(
         lambda x, y: {k: x.get(k, []) + y.get(k, []) for k in set(x.keys()).union(set(y.keys()))})
@@ -377,16 +378,20 @@ def spark_execution(sentences_list, partitions, use_embeddings):
     return json_sentences
 
 
-def single_thread_execution(sentences):
-    fasttext.util.download_model('it', if_exists='ignore')  # Italian
-    embeddings = fasttext.load_model('cc.it.300.bin')
+def single_thread_execution(sentences, use_embeddings=False, use_fasttext=False):
     dangerous_sentences, dangerous_sentences_idx, dangerous_words = find_repeated_words(sentences)
     sentences = remove_sentences(sentences, dangerous_sentences_idx)
     sentences_info = get_info_sentences(sentences)
+    embeddings = None
+    if use_embeddings or use_fasttext:
+        fasttext.util.download_model('it', if_exists='ignore')
+        embeddings = fasttext.load_model('cc.it.300.bin')
+        if use_embeddings:
+            embeddings = build_embedding_vocab(embeddings, sentences_info["vocab"])
     most_common_tags_for_word = build_common_tags_for_word(sentences)
     most_common_tags = extract_most_common_tags(sentences_info)
     similar_words = generate_similar_words_vocab(sentences_info["vocab"], most_common_tags_for_word, embeddings,
-                                                 use_fasttext=True, progress_bar=True)
+                                                 use_fasttext=use_fasttext, use_embeddings=use_embeddings, progress_bar=True)
     json_entries = create_json_entries_from_sentences(sentences, similar_words,
                                                       most_common_tags_for_words=most_common_tags_for_word,
                                                       most_common_tags=most_common_tags)
@@ -400,15 +405,21 @@ def main():
     input_file = sys.argv[1]
     output_file = sys.argv[2]
     partitions = int(sys.argv[3])
+    if partitions < 1:
+        print("Invalid number of partitions, it must be greater than 0")
+        sys.exit(1)
     similarity_method = "editdistance" if len(sys.argv) == 4 else sys.argv[4]
     sentences_list = get_list_sentences(input_file)
-    if similarity_method == "fasttext":
-        json_sentences = single_thread_execution(sentences_list)
-    elif similarity_method == "editdistance" or similarity_method == "cosine_similarity":
-        json_sentences = spark_execution(sentences_list, partitions, similarity_method == "cosine_similarity")
-    else:
+    use_embeddings = similarity_method == "cosine_similarity"
+    use_fasttext = similarity_method == "fasttext"
+    if not use_embeddings and not use_fasttext and similarity_method != "editdistance":
         print("Invalid similarity method, valid values are: 'editdistance', 'cosine_similarity' and 'fasttext'")
         sys.exit(1)
+    if partitions == 1:
+        json_sentences = single_thread_execution(sentences_list,use_embeddings=use_embeddings,use_fasttext=use_fasttext)
+    else:
+        json_sentences = spark_execution(sentences_list, partitions, use_embeddings=use_embeddings, use_fasttext=use_fasttext)
+
     write_json(json_sentences, output_file)
 
 
