@@ -165,7 +165,7 @@ def spark_execution(data: dict[str, list[str]], vocabulary: set[str], partitions
     sc = pk.SparkContext("local[*]")
     vocab = sc.parallelize(vocabulary, partitions)
     mapping = vocab.map(
-        lambda x: generate_similar_words_vocab_map(x, vocabulary, use_fasttext=True))
+        lambda x: generate_similar_words_vocab_map(x, vocabulary, use_fasttext=use_fasttext))
     print("generating similar words")
     similar_words = mapping.reduce(
         lambda x, y: {k: x.get(k, []) + y.get(k, []) for k in set(x.keys()).union(set(y.keys()))})
@@ -182,7 +182,7 @@ def single_thread_execution(data: dict[str, list[str]], vocabulary: set[str],
     if use_fasttext:
         fasttext.util.download_model('it', if_exists='ignore')  # Italian
         embeddings = fasttext.load_model('cc.it.300.bin')
-    similar_words = generate_similar_words_vocab(vocabulary, embeddings, use_fasttext=True, progress_bar=True)
+    similar_words = generate_similar_words_vocab(vocabulary, embeddings, use_fasttext=use_fasttext, progress_bar=True)
     json_entries = create_json_entries_from_data(data, similar_words)
     return json_entries
 
@@ -204,7 +204,7 @@ def main() -> None:
     data, vocab = get_data(hyponym_file, hypernym_file)
     vocabulary = get_vocabulary(vocabulary_file)
     vocabulary = vocabulary.union(vocab)
-    json_entries = spark_execution(data, vocabulary, partitions,use_fasttext) if partitions > 1 else \
+    json_entries = spark_execution(data, vocabulary, partitions, use_fasttext) if partitions > 1 else \
         single_thread_execution(data, vocabulary, use_fasttext)
 
     write_json_entries(json_entries, output_file, set_id=True)
