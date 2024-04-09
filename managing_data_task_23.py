@@ -124,7 +124,7 @@ def find_nearest_neighbors(target: str, embeddings: dict = None, use_embeddings:
     neighbors = []
     heap = []
     heapify(heap)
-    for word in embeddings.keys()
+    for word in embeddings.keys():
         if use_cache:
             if (target, word) in cache:
                 similarity = cache[(target, word)]
