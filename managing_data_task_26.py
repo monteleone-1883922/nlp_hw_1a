@@ -7,10 +7,10 @@ import pyspark as pk
 import numpy as np
 
 # Constants
-K = 5
+K = 7
 NEIGHBORS_POOL = 15
 FAVOURITE_SIMIL_TARGET = 2
-THRESHOLD = 7
+THRESHOLD = 15
 
 
 # Function to get the vocabulary from a file
@@ -96,17 +96,18 @@ def get_possible_distractors_by_edit_dist(targets: set[str], vocabulary: set[str
 
 # Function to get distractors
 def get_distractors(target: str, similar_target: list[str], target_pos: int, possible_distractors: set[str]) -> list[str]:
-    elements = similar_target
+    elements = similar_target.copy()
     for distractor in possible_distractors:
         if distractor not in similar_target:
             elements.append(distractor)
-    weights = np.array(
-        [FAVOURITE_SIMIL_TARGET] * len(similar_target) + [1] * (len(possible_distractors) - len(similar_target)),
-        dtype=float)
+    weights = np.array([1] * len(elements), dtype=float)
+    weights[: len(similar_target)] = FAVOURITE_SIMIL_TARGET
     weights /= weights.sum()
+    print(len(weights), " - ", len(elements))
     distractors = np.random.choice(elements, p=weights, size=3, replace=False).tolist()
     for distractor in distractors:
-        possible_distractors.remove(distractor)
+        if distractor in possible_distractors:
+            possible_distractors.remove(distractor)
     distractors.insert(target_pos, target)
     return distractors
 
@@ -125,7 +126,7 @@ def get_data(hyponym_file: str, hypernym_file: str) -> tuple[dict[str, list[str]
         for line in file:
             hypernyms_tmp = line.strip().split("\t")
             hypernyms.append(hypernyms_tmp)
-            vocabulary.union(set(hypernyms_tmp))
+            vocabulary = vocabulary.union(set(hypernyms_tmp))
     return {hyponym: hypernyms for hyponym, hypernyms in zip(hyponyms, hypernyms)}, vocabulary
 
 
@@ -196,7 +197,7 @@ def single_thread_execution(data: dict[str, list[str]], vocabulary: set[str], hy
 
 # Main function
 def main() -> None:
-    if len(sys.argv) != 6:
+    if len(sys.argv) < 6 or len(sys.argv) > 7:
         print("Usage: python managing_data_task_26.py <input_file1> <input_file2> <output_file> <vocabulary_file> <partitions> [<use_fasttext>]")
         sys.exit(1)
     hyponym_file = sys.argv[1]
@@ -204,7 +205,9 @@ def main() -> None:
     output_file = sys.argv[3]
     vocabulary_file = sys.argv[4]
     partitions = int(sys.argv[5])
-    use_fasttext = False if len(sys.argv) == 6 else True
+    use_fasttext = True # if len(sys.argv) != 7 else True
+    if use_fasttext:
+        fasttext.util.download_model('it', if_exists='ignore')
     if partitions < 1:
         print("Invalid number of partitions, it must be greater than 0")
         sys.exit(1)

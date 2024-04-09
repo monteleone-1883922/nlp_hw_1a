@@ -120,15 +120,19 @@ def extract_most_common_tags(sentences_info: dict) -> list[str]:
 
 
 # Function to find nearest neighbors of a target word using cosine similarity or edit distance
-def find_nearest_neighbors(target: str, embeddings: dict = None, use_embeddings: bool = False, cache:dict[tuple[str,str],int]={}) -> list[str]:
+def find_nearest_neighbors(target: str, embeddings: dict = None, use_embeddings: bool = False, cache:dict[tuple[str,str],int]={}, use_cache:bool=False) -> list[str]:
     neighbors = []
     heap = []
     heapify(heap)
-    for word in embeddings.keys():
-        if (target, word) in cache:
-            similarity = cache[(target, word)]
-        elif (word, target) in cache:
-            similarity = cache[(word, target)]
+    for word in embeddings.keys()
+        if use_cache:
+            if (target, word) in cache:
+                similarity = cache[(target, word)]
+            elif (word, target) in cache:
+                similarity = cache[(word, target)]
+            else:
+                similarity = cosine_similarity(embeddings[target],
+                                               embeddings[word]) if use_embeddings else -1 * editdistance.eval(target, word)
         else:
             similarity = cosine_similarity(embeddings[target],
                                            embeddings[word]) if use_embeddings else -1 * editdistance.eval(target, word)
