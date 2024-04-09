@@ -4,34 +4,52 @@ import time, sys, json
 import random as rnd
 import fasttext.util
 import pyspark as pk
+import numpy as np
 
 
-
-VOCABULARY_PATH = "data/SemEval2018-Task9/1B.italian.vocabulary.txt"
 K = 5
 NEIGHBORS_POOL = 15
+FAVOURITE_SIMIL_TARGET = 2
 
 
-def get_vocabulary():
+def get_vocabulary(vocabulary_path):
     return set([line.strip().lower() for line in open(VOCABULARY_PATH, 'r')])
 
-def generate_similar_words_vocab_map(word, vocabulary,embeddings=None, use_fasttext=False, use_embeddings=False, progress_bar=False):
+
+# Function to generate similar words vocabulary, used in spark execution and as block for the single thread function
+def generate_similar_words_vocab_map(word: str, vocabulary: set[str], tags_for_word: dict[str, dict[str, int]],
+                                     embeddings=None, use_fasttext: bool = False, load_embeddings: bool = True) -> dict[str, set[str]]:
+    if use_fasttext and load_embeddings:
+        embeddings = fasttext.load_model('cc.it.300.bin')
     similar_words = {}
-    similar_words[word] = get_vocabulary_neighbors(word, vocabulary, embeddings) if use_fasttext else get_possible_distractors_by_edit_dist({word}, vocabulary)
+    if len(tags_for_word[word.lower()]) < 4:
+        similar_words[word] = get_vocabulary_neighbors(word, vocabulary, embeddings) if use_fasttext else get_possible_distractors_by_edit_dist({word}, vocabulary)
     return similar_words
+
+# Function to generate similar words vocabulary in single thread execution
+def generate_similar_words_vocab(vocabulary: set[str], tags_for_word: dict[str, dict[str, int]],
+                                     embeddings=None, use_fasttext: bool = False, progress_bar=False) -> dict[str, list[str]]:
+    similar_words = {}
+    for i, word in enumerate(vocabulary):
+        if progress_bar:
+            print_progress_bar(i / len(vocabulary))
+        update = generate_similar_words_vocab_map(word, vocabulary, tags_for_word, embeddings, use_fasttext, False)
+        similar_words.update(update)
+    return similar_words
+
+
+# Function to print a progress bar
+def print_progress_bar(percentuale: float, lunghezza_barra: int = 30) -> None:
+    blocchi_compilati = int(lunghezza_barra * percentuale)
+    barra = "[" + "=" * (blocchi_compilati - 1) + ">" + " " * (lunghezza_barra - blocchi_compilati) + "]"
+    sys.stdout.write(f"\r{barra} {percentuale * 100:.2f}% completo")
+    sys.stdout.flush()
 
 
 def get_possible_distractors(targets: set[str],similar_words):
     distractors = set()
     for target in targets:
         distractors = distractors.union(similar_words[target])
-    return distractors
-
-
-def get_neighbors(targets, embeddings, vocabulary):
-    distractors = set()
-    for target in targets:
-        distractors.union(get_vocabulary_neighbors(target, vocabulary, embeddings))
     return distractors
 
 def get_vocabulary_neighbors(target, vocabulary, embeddings):
@@ -63,8 +81,14 @@ def get_possible_distractors_by_edit_dist(targets: set[str], vocabulary: set[str
     return distractors
 
 
-def get_distractors(target,target_pos, possible_distractors):
-    distractors = rnd.sample(possible_distractors, 3)
+def get_distractors(target, similar_target, target_pos, possible_distractors):
+    elements = similar_target
+    for distractor in possible_distractors:
+        if distractor not in similar_target:
+            elements.append(distractor)
+    weights = np.array([FAVOURITE_SIMIL_TARGET]*len(similar_target) + [1]*(len(possible_distractors)-len(similar_target)), dtype=float)
+    weights /= weights.sum()
+    distractors = np.random.choice(elements, p=weights, size= 3, replace=False).tolist()
     for distractor in distractors:
         possible_distractors.remove(distractor)
     distractors.insert(target_pos, target)
@@ -107,6 +131,15 @@ def create_json(data, output_file, similar_words):
             json.dump(item, jsonl_file)  # Scrivi l'oggetto JSON
             jsonl_file.write('\n')
 
+
+# Function to create JSON entries from sentences
+def create_json_entries_from_data(data, similar_words: dict[str, list[str]]) -> list[dict]:
+    json_sentences = []
+    for id, (hyponym, hypernyms) in enumerate(data.items()):
+        print_progress_bar(id / len(data))
+        json_sentences += create_json_entries(hyponym,hypernyms, similar_words)
+    return json_sentences
+
 def create_json_entries(hyponym, hypernyms, similar_words):
     targets = set([hyponym] + hypernyms)
     json_entries = []
@@ -116,7 +149,7 @@ def create_json_entries(hyponym, hypernyms, similar_words):
         json_entry = {
             "id": id,
             "text": hyponym,
-            "choices": get_distractors(hypernym, target_pos, possible_distractors),
+            "choices": get_distractors(hypernym,similar_words[hypernym], target_pos, possible_distractors),
             "label": target_pos
         }
         json_entries.append(json_entry)
@@ -131,26 +164,13 @@ def write_json_entries(json_entries, output_file, set_id=False):
             jsonl_file.write('\n')
 
 
-
-def test():
-    fasttext.util.download_model('it', if_exists='ignore')  # Italian
-    embeddings = fasttext.load_model('cc.it.300.bin')
-    print(embeddings.get_nearest_neighbors("cane_gatto", k=1))
-
-def main():
-    if len(sys.argv) != 5:
-        print("Usage: python managing_data_task_26.py <input_file1> <input_file2> <output_file>")
-        sys.exit(1)
-    hyponym_file = sys.argv[1]
-    hypernym_file = sys.argv[2]
-    output_file = sys.argv[3]
-    partitions = int(sys.argv[4])
-    fasttext.util.download_model('it', if_exists='ignore')  # Italian
-    embeddings = fasttext.load_model('cc.it.300.bin')
+# Function to execute the code for creating the reformed dataset using multiple threads
+def spark_execution(data: dict[str,list[str]],vocabulary: set[str], partitions: int,
+                    use_fasttext: bool = False) -> list[dict]:
+    if use_fasttext:
+        fasttext.util.download_model('it', if_exists='ignore')  # Italian
+        embeddings = fasttext.load_model('cc.it.300.bin')
     sc = pk.SparkContext("local[*]")
-    data, vocab = get_data(hyponym_file, hypernym_file)
-    vocabulary = get_vocabulary()
-    vocabulary = vocabulary.union(vocab)
     vocab = sc.parallelize(vocabulary, partitions)
     mapping = vocab.map(
         lambda x: generate_similar_words_vocab_map(x, vocabulary, embeddings, use_fasttext=True, use_embeddings=False))
@@ -160,14 +180,41 @@ def main():
     print("creating json")
     data = sc.parallelize(data.items(), partitions)
     json_entries = data.flatMap(lambda x: create_json_entries(x[0], x[1], similar_words)).collect()
+    return json_entries
+
+
+# Function to execute the code for creating the reformed dataset using a single thread
+def single_thread_execution(data: dict[str,list[str]],vocabulary: set[str],
+                            use_fasttext: bool = False) -> list[dict]:
+    embeddings = None
+    if use_fasttext:
+        fasttext.util.download_model('it', if_exists='ignore')  # Italian
+        embeddings = fasttext.load_model('cc.it.300.bin')
+    similar_words = generate_similar_words_vocab(vocabulary, embeddings, use_fasttext=True, progress_bar=True)
+    json_entries = create_json_entries_from_data(data, similar_words)
+    return json_entries
+
+def main():
+    if len(sys.argv) != 6:
+        print("Usage: python managing_data_task_26.py <input_file1> <input_file2> <output_file> <vocabulary_file> <partitions> [<use_fasttext>]")
+        sys.exit(1)
+    hyponym_file = sys.argv[1]
+    hypernym_file = sys.argv[2]
+    output_file = sys.argv[3]
+    vocabulary_file = sys.argv[4]
+    partitions = int(sys.argv[5])
+    use_fasttext = False if len(sys.argv) == 6 else True
+    if partitions < 1:
+        print("Invalid number of partitions, it must be greater than 0")
+        sys.exit(1)
+    data, vocab = get_data(hyponym_file, hypernym_file)
+    vocabulary = get_vocabulary(vocabulary_file)
+    vocabulary = vocabulary.union(vocab)
+    json_entries = spark_execution(data, vocabulary, partitions, use_fasttext) if partitions > 1 else single_thread_execution(data, vocabulary, use_fasttext)
+
     write_json_entries(json_entries, output_file, set_id=True)
-    #create_json(data, output_file, similar_words)
+
 
 
 if __name__ == '__main__':
-    if len(sys.argv) < 4:
-        print("Usage: python managing_data_task_26.py <input_file1> <input_file2> <output_file>")
-        sys.exit(1)
-    input_file = sys.argv[1]
-    output_file = sys.argv[2]
-    test()
+    main()
