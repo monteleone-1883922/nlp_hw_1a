@@ -20,22 +20,23 @@ def get_vocabulary(vocabulary_path: str) -> set[str]:
 
 # Function to generate a vocabulary of similar words made for running on multiple threads
 def generate_similar_words_vocab_map(word: str, vocabulary: set[str], embeddings=None,
-                                     use_fasttext: bool = False, load_embeddings: bool = True) -> dict[str, set[str]]:
+                                     use_fasttext: bool = False, load_embeddings: bool = True, cache: dict[tuple[str, str], int]={}) -> dict[str, set[str]]:
     if use_fasttext and load_embeddings:
         embeddings = fasttext.load_model('cc.it.300.bin')
     similar_words = {}
     similar_words[word] = get_vocabulary_neighbors(word, vocabulary, embeddings) if use_fasttext else \
-            get_possible_distractors_by_edit_dist({word}, vocabulary)
+            get_possible_distractors_by_edit_dist({word}, vocabulary, cache)
     return similar_words
 
 
 # Function to generate a vocabulary of similar words running on a single thread
 def generate_similar_words_vocab(vocabulary: set[str], embeddings=None, use_fasttext: bool = False, progress_bar=False) -> dict[str, list[str]]:
     similar_words = {}
+    cache = {}
     for i, word in enumerate(vocabulary):
         if progress_bar:
             print_progress_bar(i / len(vocabulary))
-        update = generate_similar_words_vocab_map(word, vocabulary, embeddings, use_fasttext, False)
+        update = generate_similar_words_vocab_map(word, vocabulary, embeddings, use_fasttext, False, cache=cache)
         similar_words.update(update)
     return similar_words
 
@@ -69,14 +70,20 @@ def get_vocabulary_neighbors(target: str, vocabulary: set[str], embeddings) -> s
 
 
 # Function to get possible distractors based on edit distance
-def get_possible_distractors_by_edit_dist(targets: set[str], vocabulary: set[str]) -> set[str]:
+def get_possible_distractors_by_edit_dist(targets: set[str], vocabulary: set[str], cache:dict[tuple[str,str],int]={}) -> set[str]:
     distractors = set()
     for target in targets:
         heap = []
         heapify(heap)
         for word in vocabulary:
             if word not in distractors and word not in targets:
-                distance = editdistance.eval(target, word)
+                if (target, word) in cache:
+                    distance = cache[(target, word)]
+                elif (word, target) in cache:
+                    distance = cache[(word, target)]
+                else:
+                    distance = editdistance.eval(target, word)
+                    cache[(target, word)] = distance
                 if len(heap) < K and distance < THRESHOLD:
                     heappush(heap, (-1 * distance, word))
                 elif len(heap) >= K and distance < -1 * heap[0][0] and distance < THRESHOLD:
@@ -88,8 +95,7 @@ def get_possible_distractors_by_edit_dist(targets: set[str], vocabulary: set[str
 
 
 # Function to get distractors
-def get_distractors(target: str, similar_target: list[str], target_pos: int, possible_distractors: set[str]) -> list[
-    str]:
+def get_distractors(target: str, similar_target: list[str], target_pos: int, possible_distractors: set[str]) -> list[str]:
     elements = similar_target
     for distractor in possible_distractors:
         if distractor not in similar_target:
@@ -164,11 +170,12 @@ def spark_execution(data: dict[str, list[str]], vocabulary: set[str], partitions
 
     sc = pk.SparkContext("local[*]")
     vocab = sc.parallelize(vocabulary, partitions)
+    cache = {}
     mapping = vocab.map(
-        lambda x: generate_similar_words_vocab_map(x, vocabulary, use_fasttext=use_fasttext))
+        lambda x: generate_similar_words_vocab_map(x, vocabulary, use_fasttext=use_fasttext, cache=cache))
     print("generating similar words")
     similar_words = mapping.reduce(
-        lambda x, y: {k: x.get(k, []) + y.get(k, []) for k in set(x.keys()).union(set(y.keys()))})
+        lambda x, y: {k: x.get(k, set()).union(y.get(k, set())) for k in set(x.keys()).union(set(y.keys()))})
     print("creating json")
     data = sc.parallelize(data.items(), partitions)
     json_entries = data.flatMap(lambda x: create_json_entries(x[0], x[1], similar_words)).collect()

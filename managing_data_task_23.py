@@ -72,12 +72,13 @@ def get_list_sentences(file_path: str) -> list[list[tuple[str, str]]]:
 def generate_similar_words_vocab(vocabulary: set[str], tags_for_word: dict[str, dict[str, int]], embeddings=None,
                                  use_fasttext: bool = False, use_embeddings: bool = False,
                                  progress_bar=False) -> dict[str, list[str]]:
+    cache = {}
     similar_words = {}
     for i, word in enumerate(vocabulary):
         if progress_bar:
             print_progress_bar(i / len(vocabulary))
         update = generate_similar_words_vocab_map(word, vocabulary, tags_for_word, embeddings, use_fasttext, False,
-                                                  use_embeddings)
+                                                  use_embeddings, cache=cache)
         similar_words.update(update)
     return similar_words
 
@@ -85,15 +86,13 @@ def generate_similar_words_vocab(vocabulary: set[str], tags_for_word: dict[str, 
 # Function to generate similar words vocabulary, used in spark execution and as block for the single thread function
 def generate_similar_words_vocab_map(word: str, vocabulary: set[str], tags_for_word: dict[str, dict[str, int]],
                                      embeddings=None, use_fasttext: bool = False, load_embeddings: bool = True,
-                                     use_embeddings: bool = False) -> dict[str, list[str]]:
+                                     use_embeddings: bool = False, cache: dict[tuple[str, str], int]={}) -> dict[str, list[str]]:
     if use_fasttext and load_embeddings:
         embeddings = fasttext.load_model('cc.it.300.bin')
     similar_words = {}
     if len(tags_for_word[word.lower()]) < 4:
         similar_words[word] = get_similar_words(word, embeddings,
-                                                vocabulary) if use_fasttext else find_nearest_neighbors(word,
-                                                                                                        embeddings,
-                                                                                                        use_embeddings)
+                                                vocabulary) if use_fasttext else find_nearest_neighbors(word,embeddings,use_embeddings, cache=cache)
     return similar_words
 
 
@@ -121,13 +120,18 @@ def extract_most_common_tags(sentences_info: dict) -> list[str]:
 
 
 # Function to find nearest neighbors of a target word using cosine similarity or edit distance
-def find_nearest_neighbors(target: str, embeddings: dict = None, use_embeddings: bool = False) -> list[str]:
+def find_nearest_neighbors(target: str, embeddings: dict = None, use_embeddings: bool = False, cache:dict[tuple[str,str],int]={}) -> list[str]:
     neighbors = []
     heap = []
     heapify(heap)
     for word in embeddings.keys():
-        similarity = cosine_similarity(embeddings[target],
-                                       embeddings[word]) if use_embeddings else -1 * editdistance.eval(target, word)
+        if (target, word) in cache:
+            similarity = cache[(target, word)]
+        elif (word, target) in cache:
+            similarity = cache[(word, target)]
+        else:
+            similarity = cosine_similarity(embeddings[target],
+                                           embeddings[word]) if use_embeddings else -1 * editdistance.eval(target, word)
         if len(heap) < NEAR_WORDS_TO_CONSIDER and (use_embeddings or similarity < THRESHOLD):
             heappush(heap, (similarity, word))
         elif len(heap) >= NEAR_WORDS_TO_CONSIDER and similarity < heap[0][0] and similarity < THRESHOLD or (use_embeddings and similarity > heap[0][0]):
