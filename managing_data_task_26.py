@@ -79,7 +79,7 @@ def get_possible_distractors_by_edit_dist(targets: set[str], vocabulary: set[str
                 distance = editdistance.eval(target, word)
                 if len(heap) < K and distance < THRESHOLD:
                     heappush(heap, (-1 * distance, word))
-                elif distance < -1 * heap[0][0] and distance < THRESHOLD:
+                elif len(heap) >= K and distance < -1 * heap[0][0] and distance < THRESHOLD:
                     heappop(heap)
                     heappush(heap, (-1 * editdistance.eval(target, word), word))
         for word in heap:

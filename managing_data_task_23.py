@@ -130,7 +130,7 @@ def find_nearest_neighbors(target: str, embeddings: dict = None, use_embeddings:
                                        embeddings[word]) if use_embeddings else -1 * editdistance.eval(target, word)
         if len(heap) < NEAR_WORDS_TO_CONSIDER and (use_embeddings or similarity < THRESHOLD):
             heappush(heap, (similarity, word))
-        elif similarity < heap[0][0] and similarity < THRESHOLD or (use_embeddings and similarity > heap[0][0]):
+        elif len(heap) >= NEAR_WORDS_TO_CONSIDER and similarity < heap[0][0] and similarity < THRESHOLD or (use_embeddings and similarity > heap[0][0]):
             heappop(heap)
             heappush(heap, (similarity, word))
     for word in heap:
