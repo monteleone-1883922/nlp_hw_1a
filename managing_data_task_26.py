@@ -19,25 +19,23 @@ def get_vocabulary(vocabulary_path: str) -> set[str]:
 
 
 # Function to generate a vocabulary of similar words made for running on multiple threads
-def generate_similar_words_vocab_map(word: str, vocabulary: set[str], tags_for_word: dict[str, dict[str, int]],
-                                     embeddings=None, use_fasttext: bool = False, load_embeddings: bool = True) -> dict[str, set[str]]:
+def generate_similar_words_vocab_map(word: str, vocabulary: set[str], embeddings=None,
+                                     use_fasttext: bool = False, load_embeddings: bool = True) -> dict[str, set[str]]:
     if use_fasttext and load_embeddings:
         embeddings = fasttext.load_model('cc.it.300.bin')
     similar_words = {}
-    if len(tags_for_word[word.lower()]) < 4:
-        similar_words[word] = get_vocabulary_neighbors(word, vocabulary, embeddings) if use_fasttext else \
+    similar_words[word] = get_vocabulary_neighbors(word, vocabulary, embeddings) if use_fasttext else \
             get_possible_distractors_by_edit_dist({word}, vocabulary)
     return similar_words
 
 
 # Function to generate a vocabulary of similar words running on a single thread
-def generate_similar_words_vocab(vocabulary: set[str], tags_for_word: dict[str, dict[str, int]],
-                                 embeddings=None, use_fasttext: bool = False, progress_bar=False) -> dict[str, list[str]]:
+def generate_similar_words_vocab(vocabulary: set[str], embeddings=None, use_fasttext: bool = False, progress_bar=False) -> dict[str, list[str]]:
     similar_words = {}
     for i, word in enumerate(vocabulary):
         if progress_bar:
             print_progress_bar(i / len(vocabulary))
-        update = generate_similar_words_vocab_map(word, vocabulary, tags_for_word, embeddings, use_fasttext, False)
+        update = generate_similar_words_vocab_map(word, vocabulary, embeddings, use_fasttext, False)
         similar_words.update(update)
     return similar_words
 
@@ -163,13 +161,11 @@ def write_json_entries(json_entries: list[dict], output_file: str, set_id=True) 
 # Function to execute the code for creating the reformed dataset using multiple threads
 def spark_execution(data: dict[str, list[str]], vocabulary: set[str], partitions: int,
                     use_fasttext: bool = False) -> list[dict]:
-    if use_fasttext:
-        fasttext.util.download_model('it', if_exists='ignore')  # Italian
-        embeddings = fasttext.load_model('cc.it.300.bin')
+
     sc = pk.SparkContext("local[*]")
     vocab = sc.parallelize(vocabulary, partitions)
     mapping = vocab.map(
-        lambda x: generate_similar_words_vocab_map(x, vocabulary, embeddings, use_fasttext=True, use_embeddings=False))
+        lambda x: generate_similar_words_vocab_map(x, vocabulary, use_fasttext=True))
     print("generating similar words")
     similar_words = mapping.reduce(
         lambda x, y: {k: x.get(k, []) + y.get(k, []) for k in set(x.keys()).union(set(y.keys()))})
@@ -194,8 +190,7 @@ def single_thread_execution(data: dict[str, list[str]], vocabulary: set[str],
 # Main function
 def main() -> None:
     if len(sys.argv) != 6:
-        print(
-            "Usage: python managing_data_task_26.py <input_file1> <input_file2> <output_file> <vocabulary_file> <partitions> [<use_fasttext>]")
+        print("Usage: python managing_data_task_26.py <input_file1> <input_file2> <output_file> <vocabulary_file> <partitions> [<use_fasttext>]")
         sys.exit(1)
     hyponym_file = sys.argv[1]
     hypernym_file = sys.argv[2]
@@ -209,9 +204,8 @@ def main() -> None:
     data, vocab = get_data(hyponym_file, hypernym_file)
     vocabulary = get_vocabulary(vocabulary_file)
     vocabulary = vocabulary.union(vocab)
-    json_entries = spark_execution(data, vocabulary, partitions,
-                                   use_fasttext) if partitions > 1 else single_thread_execution(data, vocabulary,
-                                                                                                use_fasttext)
+    json_entries = spark_execution(data, vocabulary, partitions,use_fasttext) if partitions > 1 else \
+        single_thread_execution(data, vocabulary, use_fasttext)
 
     write_json_entries(json_entries, output_file, set_id=True)
 
